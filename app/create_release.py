@@ -5,11 +5,11 @@ Automates the process of building and creating installer for EliteMining
 """
 
 import os
-import sys
+import shutil
 import subprocess
+import sys
 import time
 import zipfile
-import shutil
 from pathlib import Path
 
 # Add the app directory to the path to import version

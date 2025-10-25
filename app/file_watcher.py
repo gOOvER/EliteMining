@@ -3,20 +3,20 @@ Event-driven file monitoring system for Elite Dangerous files
 Replaces polling with efficient file system events
 """
 
-import os
-import time
-import threading
 import logging
-from typing import Callable, Optional, Dict, Set
+import os
+import threading
+import time
 from pathlib import Path
+from typing import Callable, Dict, Optional, Set
 
 try:
-    from watchdog.observers import Observer
     from watchdog.events import (
-        FileSystemEventHandler,
-        FileModifiedEvent,
         FileCreatedEvent,
+        FileModifiedEvent,
+        FileSystemEventHandler,
     )
+    from watchdog.observers import Observer
 
     WATCHDOG_AVAILABLE = True
 except ImportError:

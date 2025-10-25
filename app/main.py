@@ -1,6 +1,6 @@
+import logging
 import os
 import sys
-import logging
 
 # Initialize logging for installer version (per-session logs with auto-cleanup)
 from logging_setup import setup_logging
@@ -17,42 +17,43 @@ else:
 
 # Legacy debug log (kept for compatibility, but logging_setup.py is now primary)
 log_path = os.path.join(app_dir, "debug_log.txt")
-import json
+import datetime as dt
 import glob
+import json
 import re
 import shutil
-import datetime as dt
-from logging.handlers import RotatingFileHandler
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-from typing import Dict, Optional, Any, List
 import threading
 import time
+import tkinter as tk
 import zipfile
+from logging.handlers import RotatingFileHandler
+from tkinter import filedialog, messagebox, ttk
+from typing import Any, Dict, List, Optional
+
 import announcer
-from ring_finder import RingFinder
+from app_utils import (
+    get_app_data_dir,
+    get_app_icon_path,
+    get_ship_presets_dir,
+    get_variables_dir,
+    set_window_icon,
+)
 from config import (
     _load_cfg,
     _save_cfg,
-    load_saved_va_folder,
-    save_va_folder,
-    load_window_geometry,
-    save_window_geometry,
     load_cargo_window_position,
+    load_saved_va_folder,
+    load_window_geometry,
     save_cargo_window_position,
+    save_va_folder,
+    save_window_geometry,
 )
-from version import get_version, UPDATE_CHECK_URL, UPDATE_CHECK_INTERVAL
+from journal_parser import JournalParser
+from path_utils import get_reports_dir, get_ship_presets_dir
+from ring_finder import RingFinder
 from update_checker import UpdateChecker
 from user_database import UserDatabase
-from journal_parser import JournalParser
-from app_utils import (
-    get_app_icon_path,
-    set_window_icon,
-    get_app_data_dir,
-    get_variables_dir,
-    get_ship_presets_dir,
-)
-from path_utils import get_ship_presets_dir, get_reports_dir
+from version import UPDATE_CHECK_INTERVAL, UPDATE_CHECK_URL, get_version
 
 
 # --- Simple Tooltip class with global enable/disable ---
@@ -441,17 +442,17 @@ def _atomic_write_text(path: str, text: str) -> None:
 
 # --- Firegroup letters and NATO mapping (files use NATO words) ---
 from core.constants import (
-    FIREGROUPS,
-    NATO,
-    NATO_REVERSE,
-    VA_VARS,
-    VA_TTS_ANNOUNCEMENT,
-    TOOL_ORDER,
     ANNOUNCEMENT_TOGGLES,
-    TOGGLES,
-    TIMERS,
+    FIREGROUPS,
     MENU_COLORS,
     MINING_MATERIALS,
+    NATO,
+    NATO_REVERSE,
+    TIMERS,
+    TOGGLES,
+    TOOL_ORDER,
+    VA_TTS_ANNOUNCEMENT,
+    VA_VARS,
 )
 
 # -------------------- Config helpers (persist VA folder, window geometry, etc.) --------------------
@@ -3060,8 +3061,8 @@ cargo panel forces Elite to write detailed inventory data.
 
         print("[DEBUG] Showing refinery prompt...")
         try:
-            from tkinter import messagebox
             import tkinter as tk
+            from tkinter import messagebox
 
             # Get main app window (NOT prospector_panel subframe!)
             parent_window = None
@@ -4315,7 +4316,6 @@ cargo panel forces Elite to write detailed inventory data.
             import re
 
             # import os removed (already imported globally)
-
             # Check if we have access to the prospector panel
             if not hasattr(self, "main_app_ref") or not hasattr(
                 self.main_app_ref, "prospector_panel"
@@ -8125,7 +8125,6 @@ class App(tk.Tk):
         from tkinter import filedialog
 
         # import os removed (already imported globally)
-
         # Get current directory from prospector panel if available
         current_dir = None
         if hasattr(self, "prospector_panel") and hasattr(
@@ -8666,7 +8665,7 @@ class App(tk.Tk):
     def _check_config_migration(self):
         """Check if config needs migration and perform it if necessary"""
         try:
-            from config import needs_config_migration, migrate_config, _save_cfg
+            from config import _save_cfg, migrate_config, needs_config_migration
 
             cfg = _load_cfg()
             if needs_config_migration(cfg):
@@ -8674,6 +8673,7 @@ class App(tk.Tk):
 
                 # Backup original config
                 import shutil
+
                 from config import CONFIG_FILE
 
                 backup_path = CONFIG_FILE + ".backup"
@@ -9847,8 +9847,9 @@ class App(tk.Tk):
 
     def _auto_scan_journals_startup(self):
         """Auto-scan new journal entries on startup, with welcome dialog for first-time users"""
-        import threading
         import glob
+        import threading
+
         from incremental_journal_scanner import IncrementalJournalScanner
         from journal_scan_state import JournalScanState
 
@@ -10048,6 +10049,7 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
     def _run_initial_import_with_progress(self):
         """Run initial import with progress dialog"""
         import threading
+
         from incremental_journal_scanner import IncrementalJournalScanner
 
         # Create progress dialog
@@ -10208,6 +10210,7 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
     def _run_auto_scan_background(self):
         """Run auto-scan in background thread"""
         import threading
+
         from incremental_journal_scanner import IncrementalJournalScanner
 
         def scan_in_background():

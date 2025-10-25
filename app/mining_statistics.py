@@ -4,9 +4,9 @@ Handles material tracking, percentage yield calculations, and session analytics.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 
 log = logging.getLogger(__name__)
 

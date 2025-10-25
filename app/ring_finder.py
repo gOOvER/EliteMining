@@ -4,22 +4,23 @@ Hotspot Finder Module for EliteMining
 Provides mining hotspot location services with live API data integration
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox
-import json
-import os
 import glob
-import threading
-import requests
-import time
-import zlib
-from typing import Dict, List, Optional, Tuple
+import json
 import math
+import os
 import re
+import threading
+import time
+import tkinter as tk
+import zlib
+from tkinter import messagebox, ttk
+from typing import Dict, List, Optional, Tuple
+
+import requests
 from core.constants import MENU_COLORS
+from edsm_integration import EDSMIntegration
 from local_database import LocalSystemsDatabase
 from user_database import UserDatabase
-from edsm_integration import EDSMIntegration
 
 
 # ToolTip class for showing helpful information
@@ -2740,8 +2741,8 @@ class RingFinder:
         """Get system coordinates from galaxy_systems.db with retry logic"""
         try:
             import sqlite3
-            from pathlib import Path
             import time
+            from pathlib import Path
 
             # Use bundled galaxy database
             script_dir = Path(self.app_dir) if self.app_dir else Path(__file__).parent

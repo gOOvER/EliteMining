@@ -14,8 +14,8 @@ try:
     import matplotlib
 
     matplotlib.use("TkAgg")  # Set backend before importing pyplot
-    import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
+    import matplotlib.pyplot as plt
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
     from matplotlib.figure import Figure
 
@@ -34,8 +34,8 @@ except ImportError as e:
 
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
 from datetime import datetime, timedelta
+from tkinter import filedialog, messagebox, ttk
 
 try:
     import numpy as np
@@ -58,7 +58,8 @@ except ImportError:
     np = MockNumpy()
 import csv
 import os
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from mining_statistics import SessionAnalytics
 
 

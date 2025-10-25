@@ -5,9 +5,9 @@ Creates per-session log files with timestamps, automatic rotation,
 and cleanup of old logs. Only active when running as packaged executable.
 """
 
+import logging
 import os
 import sys
-import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional

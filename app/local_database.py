@@ -5,17 +5,18 @@ This module handles downloading, caching, and querying EDSM bulk data locally
 to provide comprehensive spatial system searches without relying on broken APIs.
 """
 
-import os
-import sqlite3
 import gzip
 import json
 import math
-import requests
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Callable
-from datetime import datetime, timedelta
+import os
+import sqlite3
 import threading
 import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Tuple
+
+import requests
 
 
 class LocalSystemsDatabase:

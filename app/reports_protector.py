@@ -3,12 +3,12 @@ Reports Folder Protection Script
 Backup and restore Reports folder during EliteMining installation
 """
 
-import shutil
-import os
-from pathlib import Path
 import json
-from datetime import datetime
+import os
+import shutil
 import tempfile
+from datetime import datetime
+from pathlib import Path
 
 
 class ReportsProtector:

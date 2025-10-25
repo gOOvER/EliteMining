@@ -3,18 +3,19 @@ Update checker module for EliteMining
 Checks GitHub releases for new versions
 """
 
-import requests
-import threading
-import time
 import json
 import os
 import sys
 import tempfile
-from pathlib import Path
-from packaging import version
+import threading
+import time
 import tkinter as tk
-from tkinter import messagebox
 import webbrowser
+from pathlib import Path
+from tkinter import messagebox
+
+import requests
+from packaging import version
 
 
 class UpdateChecker:

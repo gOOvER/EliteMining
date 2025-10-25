@@ -4,15 +4,15 @@ Incremental Journal Scanner
 Scans only new journal entries since last run, with fallback to recent journals.
 """
 
-import os
 import glob
-from datetime import datetime, timedelta
-from typing import Optional, Callable, List, Tuple
 import logging
+import os
+from datetime import datetime, timedelta
+from typing import Callable, List, Optional, Tuple
 
 from journal_parser import JournalParser
-from user_database import UserDatabase
 from journal_scan_state import JournalScanState
+from user_database import UserDatabase
 
 log = logging.getLogger(__name__)
 

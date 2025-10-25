@@ -7,24 +7,25 @@
 # - Announcements and toggles working
 # ================================================================
 
-import os
-import sys
-import json
-import glob
-import re
 import csv
-import logging
-import time
 import datetime as dt
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+import glob
+import json
+import logging
+import os
+import re
 import subprocess
-from typing import Dict, Any, Optional, List, Tuple
-from pathlib import Path
+import sys
 import tempfile
-from PIL import ImageGrab
-from core.constants import MENU_COLORS
+import time
+import tkinter as tk
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+from typing import Any, Dict, List, Optional, Tuple
+
 from app_utils import get_app_data_dir, get_reports_dir, get_variables_dir
+from core.constants import MENU_COLORS
+from PIL import ImageGrab
 
 
 def get_app_icon_path() -> str:
@@ -75,16 +76,15 @@ def get_app_icon_path() -> str:
     return None
 
 
-from mining_statistics import SessionAnalytics
-
+import announcer
 from config import (
+    CONFIG_FILE,
+    VA_TTS_ANNOUNCEMENT,
+    _atomic_write_text,
     _load_cfg,
     _save_cfg,
-    _atomic_write_text,
-    VA_TTS_ANNOUNCEMENT,
-    CONFIG_FILE,
 )
-import announcer
+from mining_statistics import SessionAnalytics
 
 # Import graphs module for graphical analytics
 try:
@@ -9489,8 +9489,8 @@ class ProspectorPanel(ttk.Frame):
 
     def _update_comment_in_text_file(self, timestamp, new_comment):
         """Update comment in the corresponding session text file. Returns True if successful, False otherwise."""
-        import re
         import csv
+        import re
 
         # Strategy 1: If timestamp is ISO format, convert directly to filename
         if "T" in timestamp:
@@ -9642,8 +9642,8 @@ class ProspectorPanel(ttk.Frame):
 
     def _update_body_in_text_file(self, timestamp, new_body):
         """Update body name in the corresponding session text file. Returns True if successful, False otherwise."""
-        import re
         import csv
+        import re
 
         # Strategy 1: If timestamp is ISO format, convert directly to filename
         if "T" in timestamp:
@@ -9745,9 +9745,9 @@ class ProspectorPanel(ttk.Frame):
         self, title: str, prompt: str, initial_value: str = ""
     ) -> str:
         """Show custom comment dialog with app logo"""
+        import os
         import tkinter as tk
         from tkinter import ttk
-        import os
 
         # Create dialog window
         dialog = tk.Toplevel(self.winfo_toplevel())
@@ -11212,7 +11212,7 @@ class ProspectorPanel(ttk.Frame):
 
         try:
             import csv
-            from collections import defaultdict, Counter
+            from collections import Counter, defaultdict
             from datetime import datetime
 
             sessions = []
@@ -11904,9 +11904,10 @@ class ProspectorPanel(ttk.Frame):
 
             # Method 1: Try weasyprint first (best quality) - skip if known to fail on Windows
             try:
-                import weasyprint
                 from urllib.parse import urljoin
                 from urllib.request import pathname2url
+
+                import weasyprint
 
                 # Set base URL for relative paths (for images, CSS, etc.)
                 base_path = (
@@ -11958,19 +11959,20 @@ class ProspectorPanel(ttk.Frame):
             # Method 3: Intelligent fallback using ReportLab with proper HTML parsing
             if not pdf_generated:
                 try:
-                    from reportlab.lib.pagesizes import letter, A4
-                    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                    import re
+                    from html import unescape
+
+                    from reportlab.lib import colors
+                    from reportlab.lib.pagesizes import A4, letter
+                    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+                    from reportlab.lib.units import inch
                     from reportlab.platypus import (
-                        SimpleDocTemplate,
                         Paragraph,
+                        SimpleDocTemplate,
                         Spacer,
                         Table,
                         TableStyle,
                     )
-                    from reportlab.lib.units import inch
-                    from reportlab.lib import colors
-                    import re
-                    from html import unescape
 
                     # Create PDF document
                     doc = SimpleDocTemplate(
@@ -12598,8 +12600,8 @@ class ProspectorPanel(ttk.Frame):
                 return
 
             # Open PDF in default viewer
-            import subprocess
             import platform
+            import subprocess
 
             if platform.system() == "Windows":
                 os.startfile(pdf_path)

@@ -1,6 +1,7 @@
-import win32com.client
-import time
 import threading
+import time
+
+import win32com.client
 from config import _load_cfg, _save_cfg
 
 # Thread-safe TTS system with proper resource management

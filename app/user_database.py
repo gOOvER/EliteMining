@@ -3,12 +3,13 @@ User Database Management for EliteMining
 Handles hotspot data and visited systems tracking
 """
 
-import os
-import sqlite3
 import logging
 import math
-from typing import List, Dict, Any, Optional, Tuple
+import os
+import sqlite3
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
 from app_utils import get_app_data_dir
 
 log = logging.getLogger("EliteMining.UserDatabase")

@@ -3,13 +3,13 @@ Elite Dangerous Journal Parser for EliteMining
 Extracts hotspot and visited system data from journal files
 """
 
-import os
-import json
 import glob
+import json
 import logging
-from typing import List, Dict, Any, Optional, Generator, Tuple
-from datetime import datetime
+import os
 import re
+from datetime import datetime
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from user_database import UserDatabase
 

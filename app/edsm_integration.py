@@ -15,11 +15,12 @@ Use case: When users DSS a ring without FSS scanning first, journal only
 provides hotspot data but not ring metadata. EDSM fills the gap.
 """
 
-import requests
-import time
 import sqlite3
-from typing import Dict, List, Optional, Tuple
+import time
 import urllib.parse
+from typing import Dict, List, Optional, Tuple
+
+import requests
 
 
 class EDSMIntegration:

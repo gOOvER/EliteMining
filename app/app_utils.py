@@ -8,7 +8,6 @@ import sys
 import tkinter as tk
 from typing import Optional
 
-
 # ==================== PATH UTILITIES ====================
 
 

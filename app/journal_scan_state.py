@@ -6,10 +6,10 @@ incremental scanning on app startup.
 """
 
 import json
+import logging
 import os
 from datetime import datetime, timedelta
 from typing import Dict, Optional
-import logging
 
 log = logging.getLogger(__name__)
 

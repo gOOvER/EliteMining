@@ -3,12 +3,12 @@ Detailed Report Generator for EliteMining
 Generates HTML reports with charts, statistics, and screenshots
 """
 
+import base64
 import json
 import os
 import sys
-import base64
-import webbrowser
 import tempfile
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 
@@ -17,8 +17,8 @@ try:
     import matplotlib
 
     matplotlib.use("Agg")  # Use non-interactive backend for saving
-    import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
+    import matplotlib.pyplot as plt
 
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
@@ -26,8 +26,9 @@ except ImportError:
 
 # Image processing imports for thumbnails
 try:
-    from PIL import Image
     import io
+
+    from PIL import Image
 
     PIL_AVAILABLE = True
 except ImportError:
