@@ -11,19 +11,20 @@ from typing import Optional
 
 # ==================== PATH UTILITIES ====================
 
+
 def get_app_data_dir() -> str:
     """
     Get the writable app data directory for both dev and installer.
-    
+
     This is the CANONICAL function for app directory resolution.
     All other code should use this function for consistent path handling.
-    
+
     Returns:
         Path to the app data directory
     """
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # Installer version - try multiple methods to find the app directory
-        va_root = os.environ.get('VA_ROOT')
+        va_root = os.environ.get("VA_ROOT")
         if va_root:
             return os.path.join(va_root, "app")
         else:
@@ -32,24 +33,24 @@ def get_app_data_dir() -> str:
             # Structure: ...\EliteMining\Configurator\EliteMining.exe
             # We need: ...\EliteMining\app\
             exe_dir = os.path.dirname(sys.executable)
-            
+
             # Check if we're in the Configurator subdirectory
-            if os.path.basename(exe_dir).lower() == 'configurator':
+            if os.path.basename(exe_dir).lower() == "configurator":
                 # Go up one level to EliteMining, then into app
                 parent_dir = os.path.dirname(exe_dir)  # EliteMining folder
                 app_dir = os.path.join(parent_dir, "app")
                 if os.path.exists(app_dir):
                     return app_dir
-            
+
             # Check if we're in an app subdirectory
-            if os.path.basename(exe_dir).lower() == 'app':
+            if os.path.basename(exe_dir).lower() == "app":
                 return exe_dir  # We're already in the app directory
-            
+
             # Try app folder as subdirectory of current location
             app_dir = os.path.join(exe_dir, "app")
             if os.path.exists(app_dir):
                 return app_dir
-            
+
             # Last resort - use exe directory itself
             return exe_dir
     else:
@@ -59,15 +60,15 @@ def get_app_data_dir() -> str:
 
 def get_ship_presets_dir() -> str:
     """Get ship presets directory"""
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # Installer version - use VA root
-        va_root = os.environ.get('VA_ROOT')
+        va_root = os.environ.get("VA_ROOT")
         if va_root:
             return os.path.join(va_root, "app", "Ship Presets")
     else:
         # Development version - use local folder
         return os.path.join(os.path.dirname(os.path.abspath(__file__)), "Ship Presets")
-    
+
     # Fallback
     return os.path.join(get_app_data_dir(), "Ship Presets")
 
@@ -85,16 +86,16 @@ def get_data_dir() -> str:
 def get_variables_dir() -> str:
     """
     Get the Variables directory for VoiceAttack integration.
-    
+
     In installer mode: Uses VA_ROOT from environment (VoiceAttack installation)
     In dev mode: Uses local Variables folder in dev directory
-    
+
     Returns:
         Path to the Variables directory
     """
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # Installer version - use VA root from environment
-        va_root = os.environ.get('VA_ROOT')
+        va_root = os.environ.get("VA_ROOT")
         if va_root:
             return os.path.join(va_root, "Variables")
         # Fallback: construct from app dir
@@ -107,59 +108,62 @@ def get_variables_dir() -> str:
 
 # ==================== ICON UTILITIES ====================
 
+
 def get_app_icon_path() -> Optional[str]:
     """
     Get the path to the application icon, handling both development and compiled environments.
-    
+
     This is the CANONICAL function for icon path resolution. All other code should use this
     function to ensure consistent icon handling across development and installer modes.
-    
+
     Returns:
         Path to icon file if found, None otherwise
     """
     # Try multiple approaches to find the icon
     search_paths = []
-    
+
     # Method 1: Use __file__ if available (development) or _MEIPASS (PyInstaller)
     try:
-        if hasattr(sys, '_MEIPASS'):
+        if hasattr(sys, "_MEIPASS"):
             # PyInstaller compiled executable
             search_paths.append(sys._MEIPASS)
-        elif '__file__' in globals():
+        elif "__file__" in globals():
             # Development environment
             search_paths.append(os.path.dirname(os.path.abspath(__file__)))
     except:
         pass
-    
+
     # Method 2: Current working directory
     search_paths.append(os.getcwd())
-    
+
     # Method 3: Directory containing the executable
     try:
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, "frozen", False):
             search_paths.append(os.path.dirname(sys.executable))
     except:
         pass
-    
+
     # Method 4: App data directory and parent directories
     try:
         app_dir = get_app_data_dir()
-        search_paths.extend([
-            app_dir,
-            os.path.dirname(app_dir),  # Parent of app dir
-            os.path.join(app_dir, "Images"),
-            os.path.join(os.path.dirname(app_dir), "Images")
-        ])
+        search_paths.extend(
+            [
+                app_dir,
+                os.path.dirname(app_dir),  # Parent of app dir
+                os.path.join(app_dir, "Images"),
+                os.path.join(os.path.dirname(app_dir), "Images"),
+            ]
+        )
     except:
         pass
-    
+
     # Method 5: Hardcoded relative paths (for various deployment scenarios)
-    search_paths.extend(['.', 'app', '..', '../app'])
-    
+    search_paths.extend([".", "app", "..", "../app"])
+
     # Try each path with different icon names and subdirectories
-    icon_names = ['logo.ico', 'logo_multi.ico', 'logo.png']
-    subdirectories = ['Images', 'images', 'img', '']  # Empty string for base path
-    
+    icon_names = ["logo.ico", "logo_multi.ico", "logo.png"]
+    subdirectories = ["Images", "images", "img", ""]  # Empty string for base path
+
     for base_path in search_paths:
         for subdir in subdirectories:
             for icon_name in icon_names:
@@ -167,23 +171,23 @@ def get_app_icon_path() -> Optional[str]:
                     icon_path = os.path.join(base_path, subdir, icon_name)
                 else:
                     icon_path = os.path.join(base_path, icon_name)
-                    
+
                 if os.path.exists(icon_path):
                     return icon_path
-    
+
     return None
 
 
 def set_window_icon(window: tk.Tk | tk.Toplevel) -> bool:
     """
     Set the icon for a Tkinter window using the standard app icon.
-    
+
     This function should be used by ALL windows and dialogs to ensure consistent
     icon handling. It automatically handles .ico vs .png files and fallbacks.
-    
+
     Args:
         window: The Tkinter window or dialog to set the icon for
-        
+
     Returns:
         True if icon was set successfully, False otherwise
     """
@@ -191,23 +195,24 @@ def set_window_icon(window: tk.Tk | tk.Toplevel) -> bool:
         icon_path = get_app_icon_path()
         if not icon_path:
             return False
-            
-        if icon_path.endswith('.ico'):
+
+        if icon_path.endswith(".ico"):
             # Use iconbitmap for .ico files (Windows standard)
             window.iconbitmap(icon_path)
         else:
             # Use iconphoto for .png files (cross-platform)
             icon_image = tk.PhotoImage(file=icon_path)
             window.iconphoto(False, icon_image)
-        
+
         return True
-        
+
     except Exception:
         # Icon setting failed, but don't crash the application
         return False
 
 
 # ==================== LEGACY COMPATIBILITY ====================
+
 
 # Keep old function names for backward compatibility during migration
 def get_app_icon_path_legacy() -> str:

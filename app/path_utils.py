@@ -15,14 +15,16 @@ USER DATA PATHS (must be preserved):
 APP RESOURCE PATHS (can be overwritten):
 - Images: get_images_dir()
 """
+
 import os
 import sys
 
+
 def get_app_data_dir():
     """Get the writable app data directory for both dev and installer"""
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # Installer version - try multiple methods to find the app directory
-        va_root = os.environ.get('VA_ROOT')
+        va_root = os.environ.get("VA_ROOT")
         if va_root:
             return os.path.join(va_root, "app")
         else:
@@ -31,38 +33,39 @@ def get_app_data_dir():
             # Structure: ...\EliteMining\Configurator\EliteMining.exe
             # We need: ...\EliteMining\app\
             exe_dir = os.path.dirname(sys.executable)
-            
+
             # Check if we're in the Configurator subdirectory
-            if os.path.basename(exe_dir).lower() == 'configurator':
+            if os.path.basename(exe_dir).lower() == "configurator":
                 # Go up one level to EliteMining, then into app
                 parent_dir = os.path.dirname(exe_dir)  # EliteMining folder
                 app_dir = os.path.join(parent_dir, "app")
                 if os.path.exists(app_dir):
                     return app_dir
-            
+
             # Check if we're in an app subdirectory
-            if os.path.basename(exe_dir).lower() == 'app':
+            if os.path.basename(exe_dir).lower() == "app":
                 return exe_dir  # We're already in the app directory
-            
+
             # Try app folder as subdirectory of current location
             app_dir = os.path.join(exe_dir, "app")
             if os.path.exists(app_dir):
                 return app_dir
-            
+
             # Last resort - use exe directory itself
             return exe_dir
     else:
         # Development version - use actual app directory
         return os.path.dirname(os.path.abspath(__file__))
 
+
 def get_ship_presets_dir():
     """
     Get ship presets directory - ensures user presets are preserved
     User data location that should NOT be overwritten during updates
     """
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # Installer version - use VA root
-        va_root = os.environ.get('VA_ROOT')
+        va_root = os.environ.get("VA_ROOT")
         if va_root:
             presets_dir = os.path.join(va_root, "app", "Ship Presets")
             # Ensure directory exists
@@ -70,14 +73,17 @@ def get_ship_presets_dir():
             return presets_dir
     else:
         # Development version - use local folder
-        presets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Ship Presets")
+        presets_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "Ship Presets"
+        )
         os.makedirs(presets_dir, exist_ok=True)
         return presets_dir
-    
+
     # Fallback - should rarely be used
     presets_dir = os.path.join(get_app_data_dir(), "Ship Presets")
     os.makedirs(presets_dir, exist_ok=True)
     return presets_dir
+
 
 def get_reports_dir():
     """
@@ -89,6 +95,7 @@ def get_reports_dir():
     os.makedirs(reports_dir, exist_ok=True)
     return reports_dir
 
+
 def get_bookmarks_file():
     """
     Get path to mining bookmarks JSON file
@@ -96,6 +103,7 @@ def get_bookmarks_file():
     Protected by backup/restore system during updates
     """
     return os.path.join(get_app_data_dir(), "mining_bookmarks.json")
+
 
 def get_images_dir():
     """

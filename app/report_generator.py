@@ -15,9 +15,11 @@ from pathlib import Path
 # Chart generation imports
 try:
     import matplotlib
-    matplotlib.use('Agg')  # Use non-interactive backend for saving
+
+    matplotlib.use("Agg")  # Use non-interactive backend for saving
     import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
+
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
@@ -26,6 +28,7 @@ except ImportError:
 try:
     from PIL import Image
     import io
+
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
@@ -34,12 +37,12 @@ except ImportError:
 class ReportGenerator:
     def __init__(self, main_app=None):
         self.main_app = main_app
-        
+
         # Use consistent directory detection logic with the main app
-        if main_app and hasattr(main_app, 'va_root'):
+        if main_app and hasattr(main_app, "va_root"):
             # Use main app's va_root for consistency
             va_root = main_app.va_root
-            if getattr(sys, 'frozen', False):
+            if getattr(sys, "frozen", False):
                 # Running as executable (installer version)
                 app_dir = os.path.join(va_root, "app")
             else:
@@ -47,40 +50,44 @@ class ReportGenerator:
                 app_dir = os.path.dirname(os.path.abspath(__file__))
         else:
             # Fallback logic when main_app is not available
-            if getattr(sys, 'frozen', False):
+            if getattr(sys, "frozen", False):
                 # Running as executable (installer version)
                 app_dir = Path(sys.executable).parent / "app"
             else:
                 # Running as script (development version)
                 app_dir = Path("app")
-            
+
         self.reports_dir = os.path.join(app_dir, "Reports")
-        self.mining_session_reports_dir = os.path.join(self.reports_dir, "Mining Session")
-        self.enhanced_reports_dir = os.path.join(self.mining_session_reports_dir, "Detailed Reports")
+        self.mining_session_reports_dir = os.path.join(
+            self.reports_dir, "Mining Session"
+        )
+        self.enhanced_reports_dir = os.path.join(
+            self.mining_session_reports_dir, "Detailed Reports"
+        )
         self.screenshots_dir = os.path.join(self.enhanced_reports_dir, "Screenshots")
-        
+
         # Create directories
         os.makedirs(self.enhanced_reports_dir, exist_ok=True)
         os.makedirs(self.screenshots_dir, exist_ok=True)
-        
+
     def _safe_float(self, value, default=0.0):
         """Safely convert any value to float for formatting"""
         try:
             return float(value)
         except (ValueError, TypeError):
             return default
-        
+
     def _get_logo_path(self):
         """Get correct logo path for both dev and installer versions"""
         # Use consistent directory detection
-        if self.main_app and hasattr(self.main_app, 'va_root'):
+        if self.main_app and hasattr(self.main_app, "va_root"):
             va_root = self.main_app.va_root
-            if getattr(sys, 'frozen', False):
+            if getattr(sys, "frozen", False):
                 # Running as executable (installer version)
                 logo_paths = [
                     os.path.join(va_root, "Images", "elitemining_logo.png"),
                     os.path.join(va_root, "app", "Images", "elitemining_logo.png"),
-                    os.path.join(va_root, "Images", "logo.png")
+                    os.path.join(va_root, "Images", "logo.png"),
                 ]
             else:
                 # Running as script (development version)
@@ -89,33 +96,33 @@ class ReportGenerator:
                 logo_paths = [
                     os.path.join(parent_dir, "Images", "elitemining_logo.png"),
                     os.path.join(app_dir, "Images", "elitemining_logo.png"),
-                    os.path.join(parent_dir, "Images", "logo.png")
+                    os.path.join(parent_dir, "Images", "logo.png"),
                 ]
         else:
             # Fallback logo paths
             logo_paths = [
                 "Images/elitemining_logo.png",
-                "app/Images/elitemining_logo.png", 
+                "app/Images/elitemining_logo.png",
                 "../Images/elitemining_logo.png",
                 "Images/logo.png",
-                "app/Images/logo.png"
+                "app/Images/logo.png",
             ]
-        
+
         for logo_path in logo_paths:
             if os.path.exists(logo_path):
                 return logo_path
-                
+
         # If no logo found, return None
         return None
-        
+
     def _encode_image_base64(self, image_path):
         """Convert image to base64 for HTML embedding"""
         if not image_path or not os.path.exists(image_path):
             return None
-            
+
         try:
             with open(image_path, "rb") as img_file:
-                return base64.b64encode(img_file.read()).decode('utf-8')
+                return base64.b64encode(img_file.read()).decode("utf-8")
         except Exception as e:
             print(f"Error encoding image {image_path}: {e}")
             return None
@@ -124,39 +131,43 @@ class ReportGenerator:
         """Create a thumbnail version of an image and return as base64"""
         if not image_path or not os.path.exists(image_path) or not PIL_AVAILABLE:
             return self._encode_image_base64(image_path)  # Fallback to full size
-            
+
         try:
             with Image.open(image_path) as img:
                 # Convert to RGB if necessary (for PNG with transparency)
-                if img.mode in ('RGBA', 'LA'):
-                    background = Image.new('RGB', img.size, (255, 255, 255))
-                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                if img.mode in ("RGBA", "LA"):
+                    background = Image.new("RGB", img.size, (255, 255, 255))
+                    background.paste(
+                        img, mask=img.split()[-1] if img.mode == "RGBA" else None
+                    )
                     img = background
-                elif img.mode != 'RGB':
-                    img = img.convert('RGB')
-                
+                elif img.mode != "RGB":
+                    img = img.convert("RGB")
+
                 # Create thumbnail
                 img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
-                
+
                 # Save to bytes
                 buffer = io.BytesIO()
-                img.save(buffer, format='JPEG', quality=85, optimize=True)
+                img.save(buffer, format="JPEG", quality=85, optimize=True)
                 buffer.seek(0)
-                
-                return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+                return base64.b64encode(buffer.getvalue()).decode("utf-8")
         except Exception as e:
             print(f"Error creating thumbnail for {image_path}: {e}")
             return self._encode_image_base64(image_path)  # Fallback to full size
-    
+
     def _get_default_screenshots_folder(self):
         """Get default screenshots folder path"""
         try:
-            if self.main_app and hasattr(self.main_app, 'screenshots_folder_path'):
-                return self.main_app.screenshots_folder_path.get() or os.path.join(os.path.expanduser("~"), "Pictures")
+            if self.main_app and hasattr(self.main_app, "screenshots_folder_path"):
+                return self.main_app.screenshots_folder_path.get() or os.path.join(
+                    os.path.expanduser("~"), "Pictures"
+                )
             return os.path.join(os.path.expanduser("~"), "Pictures")
         except:
             return os.path.join(os.path.expanduser("~"), "Pictures")
-            
+
     def _get_html_template(self):
         """Get HTML template for reports"""
         return """
@@ -855,8 +866,14 @@ class ReportGenerator:
 </body>
 </html>
         """
-        
-    def generate_report(self, session_data, include_charts=True, include_screenshots=True, include_statistics=True):
+
+    def generate_report(
+        self,
+        session_data,
+        include_charts=True,
+        include_screenshots=True,
+        include_statistics=True,
+    ):
         """Generate enhanced HTML report"""
         try:
             # Get logo
@@ -866,40 +883,44 @@ class ReportGenerator:
                 logo_base64 = self._encode_image_base64(logo_path)
                 if logo_base64:
                     logo_section = f'<img src="data:image/png;base64,{logo_base64}" alt="EliteMining Logo" class="logo">'
-            
+
             # Generate session stats
             session_stats = self._generate_session_stats(session_data)
-            
+
             # Generate charts section
             charts_section = ""
             if include_charts:
                 charts_section = self._generate_charts_section(session_data)
-            
+
             # Generate screenshots section
             screenshots_section = ""
             if include_screenshots:
                 screenshots_section = self._generate_screenshots_section(session_data)
-                
+
             # Generate statistics section
             statistics_section = ""
             if include_statistics:
                 statistics_section = self._generate_statistics_section(session_data)
-            
+
             # Generate advanced mining analytics section
-            advanced_analytics_section = self._generate_advanced_analytics_section(session_data)
-            
+            advanced_analytics_section = self._generate_advanced_analytics_section(
+                session_data
+            )
+
             # Generate comment section
             comment_section = self._generate_comment_section(session_data)
-            
+
             # Generate materials table
             materials_table = self._generate_materials_table(session_data)
-            
+
             # Generate engineering materials section
-            engineering_materials_section = self._generate_engineering_materials_section(session_data)
-            
+            engineering_materials_section = (
+                self._generate_engineering_materials_section(session_data)
+            )
+
             # Generate raw data table
             raw_data_table = self._generate_raw_data_table(session_data)
-            
+
             # Fill template
             html_content = self._get_html_template().format(
                 logo_section=logo_section,
@@ -912,31 +933,31 @@ class ReportGenerator:
                 comment_section=comment_section,
                 materials_table=materials_table,
                 engineering_materials_section=engineering_materials_section,
-                raw_data_table=raw_data_table
+                raw_data_table=raw_data_table,
             )
-            
+
             return html_content
-            
+
         except Exception as e:
             print(f"Error generating report: {e}")
             return None
-            
+
     def _generate_session_stats(self, session_data):
         """Generate session statistics HTML"""
         if not session_data:
             return "<p>No session data available</p>"
-        
+
         # Use correct field names from CSV/reports tab data
         # Duration comes as already formatted string (e.g., "06:43")
-        duration_str = session_data.get('duration', '0h 0m')
-        if duration_str and ':' in duration_str:
+        duration_str = session_data.get("duration", "0h 0m")
+        if duration_str and ":" in duration_str:
             # Duration is already formatted as "06:43", just add "h" and "m"
-            parts = duration_str.split(':')
+            parts = duration_str.split(":")
             if len(parts) == 2:
                 duration_str = f"{parts[0]}h {parts[1]}m"
-        
+
         # TPH comes as already calculated float/string (e.g., "461.8")
-        tph_value = session_data.get('tph', 0)
+        tph_value = session_data.get("tph", 0)
         if isinstance(tph_value, str):
             try:
                 tph_value = float(tph_value)
@@ -944,9 +965,9 @@ class ReportGenerator:
                 tph_value = 0.0
         elif tph_value is None:
             tph_value = 0.0
-        
-        # Tons comes as already calculated float/string (e.g., "44.0")  
-        tons_value = session_data.get('tons', 0)
+
+        # Tons comes as already calculated float/string (e.g., "44.0")
+        tons_value = session_data.get("tons", 0)
         if isinstance(tons_value, str):
             try:
                 tons_value = float(tons_value)
@@ -954,28 +975,30 @@ class ReportGenerator:
                 tons_value = 0.0
         elif tons_value is None:
             tons_value = 0.0
-        
+
         # Prospectors used
-        prospectors_used = session_data.get('prospectors', 0)
+        prospectors_used = session_data.get("prospectors", 0)
         if isinstance(prospectors_used, str):
             try:
-                prospectors_used = int(prospectors_used) if prospectors_used != '—' else 0
+                prospectors_used = (
+                    int(prospectors_used) if prospectors_used != "—" else 0
+                )
             except:
                 prospectors_used = 0
-        
+
         # Materials count
-        materials_count = session_data.get('materials', 0)
+        materials_count = session_data.get("materials", 0)
         if isinstance(materials_count, str):
             try:
-                materials_count = int(materials_count) if materials_count != '—' else 0
+                materials_count = int(materials_count) if materials_count != "—" else 0
             except:
                 materials_count = 0
-        
+
         # Get session type (from cargo data or parse from header as fallback)
-        session_type = session_data.get('session_type', '')
+        session_type = session_data.get("session_type", "")
         if not session_type:
             # Fallback: Parse from header if session_type not in data
-            header = session_data.get('header', '')
+            header = session_data.get("header", "")
             if "(Multi-Session)" in header:
                 session_type = "Multi-Session"
             elif "(Single Session)" in header:
@@ -985,7 +1008,7 @@ class ReportGenerator:
         else:
             # Clean up session_type (remove parentheses if present)
             session_type = session_type.replace("(", "").replace(")", "")
-        
+
         stats_html = f"""
         <div class="stat-card">
             <div class="stat-value">{session_type}</div>
@@ -1012,9 +1035,9 @@ class ReportGenerator:
             <div class="stat-label">Mineral Types</div>
         </div>
         """
-        
+
         return stats_html
-        
+
     def _generate_charts_section(self, session_data):
         """Generate charts section HTML"""
         charts_html = """
@@ -1022,11 +1045,11 @@ class ReportGenerator:
             <h2>📈 Mining Charts</h2>
             <div class="charts-grid">
         """
-        
+
         try:
             # First try to use saved session graphs (works without matplotlib for PNG files)
             saved_charts_html = self._add_saved_charts(session_data)
-            
+
             # If saved charts found, use them
             if saved_charts_html:
                 charts_html += saved_charts_html
@@ -1044,11 +1067,11 @@ class ReportGenerator:
                         """
                 else:
                     charts_html += "<p><em>Charts are not available - matplotlib module not found and no saved charts</em></p>"
-                    
+
         except Exception as e:
             print(f"Error generating charts: {e}")
             charts_html += "<p><em>Error generating charts</em></p>"
-            
+
         charts_html += """
             </div>
         </div>"""
@@ -1061,10 +1084,10 @@ class ReportGenerator:
             session_id = self._get_session_id_from_data(session_data)
             if not session_id:
                 return None
-            
+
             # Load graph mappings - use same path logic as graph saving
-            if self.main_app and hasattr(self.main_app, 'va_root'):
-                if getattr(sys, 'frozen', False):
+            if self.main_app and hasattr(self.main_app, "va_root"):
+                if getattr(sys, "frozen", False):
                     # Running as executable (installer version)
                     app_dir = os.path.join(self.main_app.va_root, "app")
                 else:
@@ -1073,57 +1096,73 @@ class ReportGenerator:
             else:
                 # Fallback
                 app_dir = os.path.dirname(__file__)
-                
+
             graphs_dir = os.path.join(app_dir, "Reports", "Mining Session", "Graphs")
             mappings_file = os.path.join(graphs_dir, "graph_mappings.json")
-            
+
             if not os.path.exists(mappings_file):
                 return None
-            
-            with open(mappings_file, 'r', encoding='utf-8') as f:
+
+            with open(mappings_file, "r", encoding="utf-8") as f:
                 mappings = json.load(f)
-            
+
             # First try exact match
             if session_id in mappings:
                 matched_session_id = session_id
             else:
                 # Try fuzzy matching - look for sessions with same system, body, and similar timestamp (within same minute)
                 matched_session_id = None
-                session_parts = session_id.split('_')
-                if len(session_parts) >= 4:  # Session_YYYY-MM-DD_HH-MM-SS_System_Body...
-                    target_datetime = session_parts[1] + "_" + session_parts[2]  # YYYY-MM-DD_HH-MM-SS
-                    target_system = "_".join(session_parts[3:-1]) if len(session_parts) > 4 else session_parts[3]
+                session_parts = session_id.split("_")
+                if (
+                    len(session_parts) >= 4
+                ):  # Session_YYYY-MM-DD_HH-MM-SS_System_Body...
+                    target_datetime = (
+                        session_parts[1] + "_" + session_parts[2]
+                    )  # YYYY-MM-DD_HH-MM-SS
+                    target_system = (
+                        "_".join(session_parts[3:-1])
+                        if len(session_parts) > 4
+                        else session_parts[3]
+                    )
                     target_body = session_parts[-1]
-                    
+
                     # Extract date and hour-minute for fuzzy matching
                     target_date = session_parts[1]  # YYYY-MM-DD
-                    target_hour_min = session_parts[2].split('-')[:2]  # [HH, MM]
-                    
+                    target_hour_min = session_parts[2].split("-")[:2]  # [HH, MM]
+
                     for mapping_key in mappings.keys():
-                        mapping_parts = mapping_key.split('_')
+                        mapping_parts = mapping_key.split("_")
                         if len(mapping_parts) >= 4:
                             map_date = mapping_parts[1]
-                            map_hour_min = mapping_parts[2].split('-')[:2]
-                            map_system = "_".join(mapping_parts[3:-1]) if len(mapping_parts) > 4 else mapping_parts[3]
+                            map_hour_min = mapping_parts[2].split("-")[:2]
+                            map_system = (
+                                "_".join(mapping_parts[3:-1])
+                                if len(mapping_parts) > 4
+                                else mapping_parts[3]
+                            )
                             map_body = mapping_parts[-1]
-                            
+
                             # Check if same date, same hour:minute, same system, same body
-                            if (map_date == target_date and 
-                                map_hour_min == target_hour_min and 
-                                map_system == target_system and 
-                                map_body == target_body):
+                            if (
+                                map_date == target_date
+                                and map_hour_min == target_hour_min
+                                and map_system == target_system
+                                and map_body == target_body
+                            ):
                                 matched_session_id = mapping_key
                                 break
-                
+
                 if not matched_session_id:
                     return None
-            
+
             session_graphs = mappings[matched_session_id]
             charts_html = ""
-            
+
             # Add timeline chart if available
-            if session_graphs.get('timeline_graph'):
-                timeline_path = os.path.join(graphs_dir, session_graphs['timeline_graph'])
+            if session_graphs.get("timeline_graph"):
+                timeline_path = os.path.join(
+                    graphs_dir, session_graphs["timeline_graph"]
+                )
                 if os.path.exists(timeline_path):
                     timeline_base64 = self._encode_image_base64(timeline_path)
                     if timeline_base64:
@@ -1133,10 +1172,12 @@ class ReportGenerator:
                             <img src="data:image/png;base64,{timeline_base64}" alt="Yield Timeline Chart">
                         </div>
                         """
-            
+
             # Add comparison chart if available
-            if session_graphs.get('comparison_graph'):
-                comparison_path = os.path.join(graphs_dir, session_graphs['comparison_graph'])
+            if session_graphs.get("comparison_graph"):
+                comparison_path = os.path.join(
+                    graphs_dir, session_graphs["comparison_graph"]
+                )
                 if os.path.exists(comparison_path):
                     comparison_base64 = self._encode_image_base64(comparison_path)
                     if comparison_base64:
@@ -1146,7 +1187,7 @@ class ReportGenerator:
                             <img src="data:image/png;base64,{comparison_base64}" alt="Mineral Comparison Chart">
                         </div>
                         """
-            
+
             # Add pie chart for material breakdown (still generated dynamically) - moved to Session Overview
             # pie_chart_base64 = self._generate_pie_chart(session_data)
             # if pie_chart_base64:
@@ -1156,9 +1197,9 @@ class ReportGenerator:
             #         <img src="data:image/png;base64,{pie_chart_base64}" alt="Material Breakdown Chart">
             #     </div>
             #     """
-            
+
             return charts_html if charts_html else None
-            
+
         except Exception as e:
             print(f"Error loading saved charts: {e}")
             return None
@@ -1168,111 +1209,133 @@ class ReportGenerator:
         try:
             # Try to get timestamp, system, and body from session data
             timestamp = None
-            system = session_data.get('system', '').strip()
-            body = session_data.get('body', '').strip()
-            
+            system = session_data.get("system", "").strip()
+            body = session_data.get("body", "").strip()
+
             # Try to extract timestamp from session data
-            if 'date' in session_data:
-                date_str = session_data['date']
-                
+            if "date" in session_data:
+                date_str = session_data["date"]
+
                 # Try to parse different date formats and convert to our timestamp format
                 try:
                     # Handle formats like "09/24/25 16:04" or "2025-09-24 16:04:31"
-                    if '/' in date_str and len(date_str.split(' ')) >= 2:
+                    if "/" in date_str and len(date_str.split(" ")) >= 2:
                         # Format like "09/24/25 16:04"
-                        date_part, time_part = date_str.split(' ', 1)
-                        month, day, year = date_part.split('/')
+                        date_part, time_part = date_str.split(" ", 1)
+                        month, day, year = date_part.split("/")
                         # Convert 2-digit year to 4-digit
                         if len(year) == 2:
                             year = f"20{year}"
-                        
+
                         # Parse time (might be HH:MM or HH:MM:SS)
-                        time_parts = time_part.split(':')
+                        time_parts = time_part.split(":")
                         if len(time_parts) == 2:
                             hour, minute = time_parts
                             second = "00"
                         else:
                             hour, minute, second = time_parts
-                        
+
                         # Format as our timestamp format: YYYY-MM-DD_HH-MM-SS
                         timestamp = f"{year}-{month.zfill(2)}-{day.zfill(2)}_{hour.zfill(2)}-{minute.zfill(2)}-{second.zfill(2)}"
-                        
+
                 except Exception:
                     # If parsing fails, skip timestamp
                     pass
-            
+
             if not timestamp or not system:
                 return None
-            
+
             # Clean system and body names (same as in auto_save_graphs)
-            clean_system = "".join(c for c in system if c.isalnum() or c in (' ', '-', '_')).strip()
-            clean_system = clean_system.replace(' ', '_')
-            
-            clean_body = "".join(c for c in body if c.isalnum() or c in (' ', '-', '_')).strip()
-            clean_body = clean_body.replace(' ', '_')
-            
+            clean_system = "".join(
+                c for c in system if c.isalnum() or c in (" ", "-", "_")
+            ).strip()
+            clean_system = clean_system.replace(" ", "_")
+
+            clean_body = "".join(
+                c for c in body if c.isalnum() or c in (" ", "-", "_")
+            ).strip()
+            clean_body = clean_body.replace(" ", "_")
+
             # Construct session ID (same format as in auto_save_graphs)
             session_id = f"Session_{timestamp}"
             if clean_system:
                 session_id += f"_{clean_system}"
             if clean_body:
                 session_id += f"_{clean_body}"
-            
+
             return session_id
-            
+
         except Exception as e:
             print(f"Error extracting session ID: {e}")
             return None
-        
+
     def _generate_pie_chart(self, session_data):
         """Generate material breakdown pie chart"""
         if not MATPLOTLIB_AVAILABLE:
             return None
-            
-        materials_mined = session_data.get('materials_mined', {})
+
+        materials_mined = session_data.get("materials_mined", {})
         if not materials_mined:
             return None
-            
+
         try:
             # Create figure
             fig, ax = plt.subplots(figsize=(8, 6))
-            fig.patch.set_facecolor('white')
-            
+            fig.patch.set_facecolor("white")
+
             # Prepare data
             materials = list(materials_mined.keys())
             quantities = list(materials_mined.values())
-            
+
             # Define colors for materials
-            colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', 
-                     '#DDA0DD', '#98D8C8', '#F7DC6F', '#AED6F1', '#F8C471']
-            
+            colors = [
+                "#FF6B6B",
+                "#4ECDC4",
+                "#45B7D1",
+                "#96CEB4",
+                "#FFEAA7",
+                "#DDA0DD",
+                "#98D8C8",
+                "#F7DC6F",
+                "#AED6F1",
+                "#F8C471",
+            ]
+
             # Create pie chart
-            wedges, texts, autotexts = ax.pie(quantities, labels=materials, colors=colors[:len(materials)], 
-                                            autopct='%1.1f%%', startangle=90)
-            
+            wedges, texts, autotexts = ax.pie(
+                quantities,
+                labels=materials,
+                colors=colors[: len(materials)],
+                autopct="%1.1f%%",
+                startangle=90,
+            )
+
             # Improve text appearance
             for autotext in autotexts:
-                autotext.set_color('white')
-                autotext.set_fontweight('bold')
-            
-            ax.set_title('Mineral Breakdown by Quantity', fontsize=14, fontweight='bold', pad=20)
-            
+                autotext.set_color("white")
+                autotext.set_fontweight("bold")
+
+            ax.set_title(
+                "Mineral Breakdown by Quantity", fontsize=14, fontweight="bold", pad=20
+            )
+
             # Save to base64
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
                 temp_path = temp_file.name
-            
+
             try:
-                plt.savefig(temp_path, dpi=100, bbox_inches='tight', facecolor='white')
+                plt.savefig(temp_path, dpi=100, bbox_inches="tight", facecolor="white")
                 plt.close(fig)
                 plt.clf()  # Clear the current figure
-                
+
                 # Wait a moment for file to be released
                 import time
+
                 time.sleep(0.1)
-                
-                with open(temp_path, 'rb') as img_file:
-                    chart_base64 = base64.b64encode(img_file.read()).decode('utf-8')
-                    
+
+                with open(temp_path, "rb") as img_file:
+                    chart_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+
                 return chart_base64
             finally:
                 # Clean up temp file
@@ -1281,53 +1344,72 @@ class ReportGenerator:
                         os.unlink(temp_path)
                 except:
                     pass  # Ignore cleanup errors
-                
+
         except Exception as e:
             print(f"Error generating pie chart: {e}")
             return None
-            
+
     def _generate_timeline_chart(self, session_data):
         """Generate yield timeline chart (placeholder for now)"""
         if not MATPLOTLIB_AVAILABLE:
             return None
-            
+
         try:
             # Create a simple session progress chart
             fig, ax = plt.subplots(figsize=(10, 4))
-            fig.patch.set_facecolor('white')
-            
-            duration = session_data.get('session_duration', 0)
-            total_tons = session_data.get('total_tons_mined', 0)
-            
+            fig.patch.set_facecolor("white")
+
+            duration = session_data.get("session_duration", 0)
+            total_tons = session_data.get("total_tons_mined", 0)
+
             if duration > 0:
                 # Create a simple progress line
-                time_points = [0, duration/4, duration/2, 3*duration/4, duration]
-                cumulative_tons = [0, total_tons*0.2, total_tons*0.5, total_tons*0.8, total_tons]
-                
-                ax.plot(time_points, cumulative_tons, 'b-o', linewidth=2, markersize=6)
+                time_points = [
+                    0,
+                    duration / 4,
+                    duration / 2,
+                    3 * duration / 4,
+                    duration,
+                ]
+                cumulative_tons = [
+                    0,
+                    total_tons * 0.2,
+                    total_tons * 0.5,
+                    total_tons * 0.8,
+                    total_tons,
+                ]
+
+                ax.plot(time_points, cumulative_tons, "b-o", linewidth=2, markersize=6)
                 ax.fill_between(time_points, cumulative_tons, alpha=0.3)
-                
-                ax.set_xlabel('Session Time (seconds)', fontweight='bold')
-                ax.set_ylabel('Cumulative Tons Mined', fontweight='bold')
-                ax.set_title('Mining Progress Timeline', fontsize=14, fontweight='bold', pad=20)
+
+                ax.set_xlabel("Session Time (seconds)", fontweight="bold")
+                ax.set_ylabel("Cumulative Tons Mined", fontweight="bold")
+                ax.set_title(
+                    "Mining Progress Timeline", fontsize=14, fontweight="bold", pad=20
+                )
                 ax.grid(True, alpha=0.3)
-                
+
                 # Save to base64
-                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+                with tempfile.NamedTemporaryFile(
+                    suffix=".png", delete=False
+                ) as temp_file:
                     temp_path = temp_file.name
-                
+
                 try:
-                    plt.savefig(temp_path, dpi=100, bbox_inches='tight', facecolor='white')
+                    plt.savefig(
+                        temp_path, dpi=100, bbox_inches="tight", facecolor="white"
+                    )
                     plt.close(fig)
                     plt.clf()  # Clear the current figure
-                    
+
                     # Wait a moment for file to be released
                     import time
+
                     time.sleep(0.1)
-                    
-                    with open(temp_path, 'rb') as img_file:
-                        chart_base64 = base64.b64encode(img_file.read()).decode('utf-8')
-                        
+
+                    with open(temp_path, "rb") as img_file:
+                        chart_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+
                     return chart_base64
                 finally:
                     # Clean up temp file
@@ -1336,26 +1418,26 @@ class ReportGenerator:
                             os.unlink(temp_path)
                     except:
                         pass  # Ignore cleanup errors
-                    
+
         except Exception as e:
             print(f"Error generating timeline chart: {e}")
             return None
-        
+
     def _generate_screenshots_section(self, session_data):
         """Generate screenshots section HTML"""
         screenshots_html = """
         <div class="section">
             <h2>📸 Session Screenshots</h2>
         """
-        
+
         # Get screenshots from session data or prospector panel
-        screenshots = session_data.get('screenshots', [])
-        
+        screenshots = session_data.get("screenshots", [])
+
         if not screenshots:
             screenshots_html += "<p><em>No screenshots added to this report. Right-click the report in EliteMining and select 'Generate Detailed Report' to add screenshots.</em></p>"
         else:
             screenshots_html += '<div class="screenshot-gallery">'
-            
+
             for i, screenshot_path in enumerate(screenshots):
                 if os.path.exists(screenshot_path):
                     screenshot_base64 = self._encode_image_base64(screenshot_path)
@@ -1373,32 +1455,32 @@ class ReportGenerator:
                         <p><em>Screenshot not found: {os.path.basename(screenshot_path)}</em></p>
                     </div>
                     """
-            
-            screenshots_html += '</div>'
-            
+
+            screenshots_html += "</div>"
+
         screenshots_html += "</div>"
         return screenshots_html
-        
+
     def _generate_statistics_section(self, session_data):
         """Generate overall statistics section HTML"""
         statistics_html = """
         <div class="section">
             <h2>📊 Overall Mining Statistics</h2>
         """
-        
+
         try:
             # Try to import and use mining statistics
             from mining_statistics import SessionAnalytics
-            
+
             # Create analytics instance and load existing data
             analytics = SessionAnalytics()
             stats = analytics.calculate_statistics()
-            
-            if stats and stats.get('total_sessions', 0) > 0:
+
+            if stats and stats.get("total_sessions", 0) > 0:
                 statistics_html += """
                 <div class="stats-grid">
                 """
-                
+
                 # Add key lifetime statistics
                 statistics_html += f"""
                 <div class="stat-card">
@@ -1418,9 +1500,9 @@ class ReportGenerator:
                     <div class="stat-label">Avg Hit Rate</div>
                 </div>
                 """
-                
+
                 # Best session info
-                best_session = stats.get('best_session', {})
+                best_session = stats.get("best_session", {})
                 if best_session:
                     statistics_html += f"""
                     <div class="stat-card">
@@ -1432,9 +1514,9 @@ class ReportGenerator:
                         <div class="stat-label">Best TPH</div>
                     </div>
                     """
-                
+
                 # Most collected material
-                most_material = stats.get('most_collected_material', 'None')
+                most_material = stats.get("most_collected_material", "None")
                 statistics_html += f"""
                 <div class="stat-card">
                     <div class="stat-value">{most_material}</div>
@@ -1445,18 +1527,20 @@ class ReportGenerator:
                     <div class="stat-label">Total Asteroids</div>
                 </div>
                 """
-                
+
                 statistics_html += "</div>"
-                
+
                 # Add performance comparison for current session
-                current_tonnage = session_data.get('total_tons_mined', 0)
-                avg_tonnage = stats.get('avg_tonnage_per_session', 0)
-                
+                current_tonnage = session_data.get("total_tons_mined", 0)
+                avg_tonnage = stats.get("avg_tonnage_per_session", 0)
+
                 if current_tonnage > 0 and avg_tonnage > 0:
-                    performance_pct = ((current_tonnage - avg_tonnage) / avg_tonnage) * 100
-                    performance_text = f"{performance_pct:+.1f}%" 
+                    performance_pct = (
+                        (current_tonnage - avg_tonnage) / avg_tonnage
+                    ) * 100
+                    performance_text = f"{performance_pct:+.1f}%"
                     performance_color = "#27ae60" if performance_pct >= 0 else "#e74c3c"
-                    
+
                     statistics_html += f"""
                     <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center;">
                         <h4>Session Performance vs Average</h4>
@@ -1466,14 +1550,14 @@ class ReportGenerator:
                         </p>
                     </div>
                     """
-                    
+
             else:
                 # Try to get basic statistics from the main app's prospector panel
-                if hasattr(self.main_app, 'prospector_panel'):
+                if hasattr(self.main_app, "prospector_panel"):
                     try:
                         # Use the same method the Statistics tab uses
                         pie_chart_base64 = self._generate_pie_chart(session_data)
-                        
+
                         statistics_html += f"""
                         <div style="background: var(--section-bg); padding: 15px; border-radius: 8px; margin: 20px 0; color: var(--text-color); display: flex; align-items: flex-start; gap: 20px;">
                             <div style="flex: 1;">
@@ -1488,22 +1572,26 @@ class ReportGenerator:
                         </div>
                         """
                     except:
-                        statistics_html += "<p><em>Basic session data displayed above</em></p>"
+                        statistics_html += (
+                            "<p><em>Basic session data displayed above</em></p>"
+                        )
                 else:
-                    statistics_html += "<p><em>No historical statistics available</em></p>"
-                
+                    statistics_html += (
+                        "<p><em>No historical statistics available</em></p>"
+                    )
+
         except Exception as e:
             print(f"Error generating statistics: {e}")
             statistics_html += f"<p><em>Error loading statistics: {e}</em></p>"
-            
+
         statistics_html += "</div>"
         return statistics_html
-        
+
     def _parse_duration_to_minutes(self, duration_str):
         """Parse duration string like '06:43' to minutes for calculations"""
         try:
-            if ':' in duration_str:
-                parts = duration_str.split(':')
+            if ":" in duration_str:
+                parts = duration_str.split(":")
                 if len(parts) >= 2:
                     hours = int(parts[0])
                     minutes = int(parts[1])
@@ -1511,17 +1599,17 @@ class ReportGenerator:
             return 0
         except:
             return 0
-        
+
     def _generate_advanced_analytics_section(self, session_data):
         """Generate advanced mining analytics section HTML"""
         analytics_html = """
         <div class="section">
             <h2>🎯 Advanced Mining Analytics</h2>
         """
-        
+
         try:
             # Use correct field names from CSV/reports tab data
-            tons_value = session_data.get('tons', 0)
+            tons_value = session_data.get("tons", 0)
             if isinstance(tons_value, str):
                 try:
                     total_tons = float(tons_value)
@@ -1529,77 +1617,89 @@ class ReportGenerator:
                     total_tons = 0.0
             else:
                 total_tons = float(tons_value) if tons_value is not None else 0.0
-            
-            duration_str = session_data.get('duration', '0:0')
+
+            duration_str = session_data.get("duration", "0:0")
             # Parse duration string to minutes for calculations
-            duration_minutes = self._parse_duration_to_minutes(duration_str) if duration_str else 0
-            
-            prospectors_value = session_data.get('prospectors', 0)
+            duration_minutes = (
+                self._parse_duration_to_minutes(duration_str) if duration_str else 0
+            )
+
+            prospectors_value = session_data.get("prospectors", 0)
             if isinstance(prospectors_value, str):
                 try:
-                    prospectors_used = int(prospectors_value) if prospectors_value != '—' else 0
+                    prospectors_used = (
+                        int(prospectors_value) if prospectors_value != "—" else 0
+                    )
                 except:
                     prospectors_used = 0
             else:
                 prospectors_used = prospectors_value
-                
-            materials_mined = session_data.get('materials_mined', {})
-            
+
+            materials_mined = session_data.get("materials_mined", {})
+
             # Check if we have CSV data with detailed analytics
             hit_rate = None
             avg_quality = None
             asteroids_prospected = None
             best_material = None
-            
+
             # Try to extract from CSV data if available
-            if 'hit_rate_percent' in session_data:
-                hit_rate = session_data.get('hit_rate_percent')
-            if 'avg_quality_percent' in session_data:
-                avg_quality = session_data.get('avg_quality_percent')
-            if 'asteroids_prospected' in session_data:
-                asteroids_prospected = session_data.get('asteroids_prospected')
-            if 'best_material' in session_data:
-                best_material = session_data.get('best_material')
-            
+            if "hit_rate_percent" in session_data:
+                hit_rate = session_data.get("hit_rate_percent")
+            if "avg_quality_percent" in session_data:
+                avg_quality = session_data.get("avg_quality_percent")
+            if "asteroids_prospected" in session_data:
+                asteroids_prospected = session_data.get("asteroids_prospected")
+            if "best_material" in session_data:
+                best_material = session_data.get("best_material")
+
             # Try to parse session text file for detailed analytics if CSV data not available
             session_text_data = self._parse_session_analytics_from_text(session_data)
             if session_text_data:
                 if hit_rate is None:
-                    hit_rate = session_text_data.get('hit_rate')
+                    hit_rate = session_text_data.get("hit_rate")
                 if avg_quality is None:
-                    avg_quality = session_text_data.get('avg_quality')
+                    avg_quality = session_text_data.get("avg_quality")
                 if asteroids_prospected is None:
-                    asteroids_prospected = session_text_data.get('asteroids_prospected')
+                    asteroids_prospected = session_text_data.get("asteroids_prospected")
                 if best_material is None:
-                    best_material = session_text_data.get('best_material')
-            
+                    best_material = session_text_data.get("best_material")
+
             # Convert string values to floats to avoid formatting errors
             if hit_rate is not None and isinstance(hit_rate, str):
                 try:
                     hit_rate = float(hit_rate)
                 except:
                     hit_rate = None
-            
+
             if avg_quality is not None and isinstance(avg_quality, str):
                 try:
                     avg_quality = float(avg_quality)
                 except:
                     avg_quality = None
-                    
-            if asteroids_prospected is not None and isinstance(asteroids_prospected, str):
+
+            if asteroids_prospected is not None and isinstance(
+                asteroids_prospected, str
+            ):
                 try:
                     asteroids_prospected = int(asteroids_prospected)
                 except:
                     asteroids_prospected = None
-            
+
             # Prospecting Performance Section
-            if any([hit_rate is not None, avg_quality is not None, asteroids_prospected is not None]):
+            if any(
+                [
+                    hit_rate is not None,
+                    avg_quality is not None,
+                    asteroids_prospected is not None,
+                ]
+            ):
                 analytics_html += """
                 <div style="background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);">
                     <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">⛏️ Prospecting Performance</h3>
                     <div class="stats-grid">
                 """
-                
+
                 if hit_rate is not None:
                     analytics_html += f"""
                     <div class="stat-card">
@@ -1607,7 +1707,7 @@ class ReportGenerator:
                         <div class="stat-label">Hit Rate</div>
                     </div>
                     """
-                
+
                 if avg_quality is not None:
                     analytics_html += f"""
                     <div class="stat-card">
@@ -1615,7 +1715,7 @@ class ReportGenerator:
                         <div class="stat-label">Average Quality</div>
                     </div>
                     """
-                
+
                 if asteroids_prospected is not None:
                     analytics_html += f"""
                     <div class="stat-card">
@@ -1623,33 +1723,39 @@ class ReportGenerator:
                         <div class="stat-label">Asteroids Prospected</div>
                     </div>
                     """
-                
+
                 if prospectors_used > 0 and asteroids_prospected:
-                    efficiency = (asteroids_prospected / prospectors_used) * 100 if prospectors_used > 0 else 0
+                    efficiency = (
+                        (asteroids_prospected / prospectors_used) * 100
+                        if prospectors_used > 0
+                        else 0
+                    )
                     analytics_html += f"""
                     <div class="stat-card">
                         <div class="stat-value">{self._safe_float(efficiency):.0f}%</div>
                         <div class="stat-label">Prospector Efficiency</div>
                     </div>
                     """
-                
+
                 analytics_html += "</div></div>"
-            
+
             # Yield Breakdown Section - Show both comprehensive and filtered yields
-            individual_yields = session_data.get('individual_yields', {})
-            filtered_yields = session_data.get('filtered_yields', {})
-            total_avg_yield = session_data.get('total_average_yield', 0.0)
-            
+            individual_yields = session_data.get("individual_yields", {})
+            filtered_yields = session_data.get("filtered_yields", {})
+            total_avg_yield = session_data.get("total_average_yield", 0.0)
+
             # Fallback: calculate from individual_yields if not stored
             if not total_avg_yield and individual_yields:
-                total_avg_yield = sum(individual_yields.values()) / len(individual_yields)
-            
+                total_avg_yield = sum(individual_yields.values()) / len(
+                    individual_yields
+                )
+
             if individual_yields or filtered_yields or total_avg_yield:
                 analytics_html += """
                 <div style="background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);">
                     <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">📊 Mineral Yield Analysis</h3>
                 """
-                
+
                 # Show Total Average Yield prominently at the top
                 if total_avg_yield and total_avg_yield > 0:
                     # Color code based on yield quality
@@ -1661,7 +1767,7 @@ class ReportGenerator:
                         yield_color = "#FF9800"
                     else:
                         yield_color = "#9E9E9E"
-                    
+
                     analytics_html += f"""
                     <div style="text-align: center; margin-bottom: 25px; padding: 20px; background: linear-gradient(135deg, {yield_color}, {yield_color}CC); border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                         <div style="font-size: 48px; font-weight: bold; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">{self._safe_float(total_avg_yield):.1f}%</div>
@@ -1669,7 +1775,7 @@ class ReportGenerator:
                         <div style="font-size: 14px; color: rgba(255,255,255,0.9); margin-top: 5px; font-style: italic;">Average yield across all selected materials and prospected asteroids</div>
                     </div>
                     """
-                
+
                 # Show filtered yields first if available (announcement threshold based)
                 if filtered_yields:
                     analytics_html += """
@@ -1680,10 +1786,12 @@ class ReportGenerator:
                         </p>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
                     """
-                    
+
                     # Sort filtered yields by percentage (highest first)
-                    sorted_filtered = sorted(filtered_yields.items(), key=lambda x: x[1], reverse=True)
-                    
+                    sorted_filtered = sorted(
+                        filtered_yields.items(), key=lambda x: x[1], reverse=True
+                    )
+
                     for material, yield_percent in sorted_filtered:
                         # Color code based on yield quality - filtered yields tend to be higher
                         if yield_percent >= 30.0:
@@ -1694,16 +1802,16 @@ class ReportGenerator:
                             color_style = "background: linear-gradient(135deg, #FF9800, #F57C00); color: white;"
                         else:
                             color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
-                        
+
                         analytics_html += f"""
                         <div class="yield-card" style="padding: 12px; border-radius: 6px; text-align: center; {color_style} border: 1px solid rgba(255,255,255,0.2);">
                             <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{material}</div>
                             <div style="font-size: 18px; font-weight: bold;">{yield_percent:.1f}%</div>
                         </div>
                         """
-                    
+
                     analytics_html += "</div></div>"
-                
+
                 # Show comprehensive yields (all asteroids)
                 if individual_yields:
                     analytics_html += """
@@ -1713,10 +1821,14 @@ class ReportGenerator:
                             Selected materials across all prospected asteroids - overall efficiency
                         </p>
                     """
-                    
+
                     # Calculate total average yield for display
-                    total_yield = sum(individual_yields.values()) / len(individual_yields) if individual_yields else 0
-                    
+                    total_yield = (
+                        sum(individual_yields.values()) / len(individual_yields)
+                        if individual_yields
+                        else 0
+                    )
+
                     analytics_html += f"""
                         <div style="margin-bottom: 15px;">
                             <div class="stat-card" style="display: inline-block; margin-right: 20px;">
@@ -1731,10 +1843,12 @@ class ReportGenerator:
                         
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
                     """
-                    
+
                     # Sort materials by yield percentage (highest first)
-                    sorted_yields = sorted(individual_yields.items(), key=lambda x: x[1], reverse=True)
-                    
+                    sorted_yields = sorted(
+                        individual_yields.items(), key=lambda x: x[1], reverse=True
+                    )
+
                     for material, yield_percent in sorted_yields:
                         # Color code based on yield quality - comprehensive yields tend to be lower
                         if yield_percent >= 15.0:
@@ -1745,33 +1859,37 @@ class ReportGenerator:
                             color_style = "background: linear-gradient(135deg, #FF9800, #F57C00); color: white;"
                         else:
                             color_style = "background: linear-gradient(135deg, #9E9E9E, #757575); color: white;"
-                        
+
                         analytics_html += f"""
                         <div class="yield-card" style="padding: 12px; border-radius: 6px; text-align: center; {color_style} border: 1px solid rgba(255,255,255,0.2);">
                             <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px;">{material}</div>
                             <div style="font-size: 18px; font-weight: bold;">{yield_percent:.1f}%</div>
                         </div>
                         """
-                    
+
                     analytics_html += "</div></div>"
-                
+
                 analytics_html += "</div>"
-            
+
             # Material Analysis Section
             if materials_mined:
                 analytics_html += """
                 <div style="background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);">
                     <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">💎 Most Mined Material Analysis</h3>
                 """
-                
+
                 # Sort materials by quantity for analysis
-                sorted_materials = sorted(materials_mined.items(), key=lambda x: x[1], reverse=True)
-                
+                sorted_materials = sorted(
+                    materials_mined.items(), key=lambda x: x[1], reverse=True
+                )
+
                 # Top material stats
                 if sorted_materials:
                     top_material, top_quantity = sorted_materials[0]
-                    top_percentage = (top_quantity / total_tons) * 100 if total_tons > 0 else 0
-                    
+                    top_percentage = (
+                        (top_quantity / total_tons) * 100 if total_tons > 0 else 0
+                    )
+
                     analytics_html += f"""
                     <div class="stats-grid">
                         <div class="stat-card">
@@ -1792,7 +1910,7 @@ class ReportGenerator:
                         </div>
                     </div>
                     """
-                
+
                 # Check for manual refinery materials
                 refinery_materials = self._identify_manual_materials(session_data)
                 if refinery_materials:
@@ -1802,26 +1920,32 @@ class ReportGenerator:
                         <p style="color: var(--text-color); margin-bottom: 10px;"><strong>Materials manually added from refinery:</strong></p>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
                     """
-                    
-                    for material, quantity in sorted(refinery_materials.items(), key=lambda x: x[1], reverse=True):
-                        percentage = (quantity / total_tons) * 100 if total_tons > 0 else 0
+
+                    for material, quantity in sorted(
+                        refinery_materials.items(), key=lambda x: x[1], reverse=True
+                    ):
+                        percentage = (
+                            (quantity / total_tons) * 100 if total_tons > 0 else 0
+                        )
                         analytics_html += f"""
                         <div style="background: var(--card-bg); padding: 10px; border-radius: 5px; border: 1px solid var(--card-border); text-align: center;">
                             <div style="font-weight: bold; color: var(--stat-value-color);">{material}</div>
                             <div style="color: var(--text-color);">{self._safe_float(quantity):.1f}t ({self._safe_float(percentage):.1f}%)</div>
                         </div>
                         """
-                    
+
                     total_manual = sum(refinery_materials.values())
-                    manual_percentage = (total_manual / total_tons) * 100 if total_tons > 0 else 0
+                    manual_percentage = (
+                        (total_manual / total_tons) * 100 if total_tons > 0 else 0
+                    )
                     analytics_html += f"""
                         </div>
                         <p style="margin-top: 10px; text-align: center; color: var(--text-color);"><strong>Total Manual: {self._safe_float(total_manual):.1f}t ({self._safe_float(manual_percentage):.1f}% of session)</strong></p>
                     </div>
                     """
-                
+
                 analytics_html += "</div>"
-            
+
             # Efficiency Metrics Section
             if duration_minutes > 0 and total_tons > 0:
                 analytics_html += """
@@ -1844,22 +1968,28 @@ class ReportGenerator:
                     </div>
                     <div class="stats-grid">
                 """
-                
+
                 # Calculate various efficiency metrics using correct TPH from session data
-                tph_value = session_data.get('tph', 0)
+                tph_value = session_data.get("tph", 0)
                 if isinstance(tph_value, str):
                     try:
                         tph = float(tph_value)
                     except:
-                        tph = (total_tons / (duration_minutes / 60)) if duration_minutes > 0 else 0
+                        tph = (
+                            (total_tons / (duration_minutes / 60))
+                            if duration_minutes > 0
+                            else 0
+                        )
                 else:
                     tph = tph_value
-                
+
                 # Total Average Yield - shows overall prospecting efficiency
-                total_avg_yield = session_data.get('total_average_yield', 0.0)
-                if not total_avg_yield and session_data.get('individual_yields'):
-                    total_avg_yield = sum(session_data['individual_yields'].values()) / len(session_data['individual_yields'])
-                
+                total_avg_yield = session_data.get("total_average_yield", 0.0)
+                if not total_avg_yield and session_data.get("individual_yields"):
+                    total_avg_yield = sum(
+                        session_data["individual_yields"].values()
+                    ) / len(session_data["individual_yields"])
+
                 if total_avg_yield and total_avg_yield > 0:
                     analytics_html += f"""
                     <div class="stat-card" title="Your overall prospecting efficiency across all asteroids scanned. This is the average yield percentage of valuable minerals found in every asteroid you prospected. Higher values mean you're consistently finding rich asteroids.">
@@ -1868,9 +1998,9 @@ class ReportGenerator:
                         <div class="stat-help">🎯 Overall prospecting efficiency</div>
                     </div>
                     """
-                
+
                 # Hit Rate - asteroid selection accuracy
-                hit_rate = session_data.get('hit_rate_percent', 0)
+                hit_rate = session_data.get("hit_rate_percent", 0)
                 if hit_rate and hit_rate > 0:
                     analytics_html += f"""
                     <div class="stat-card" title="Percentage of asteroids that contained your target materials above announcement thresholds. Shows how accurate you are at selecting profitable asteroids. Higher rates mean better targeting skills and less wasted prospector limpets.">
@@ -1879,7 +2009,7 @@ class ReportGenerator:
                         <div class="stat-help">🎯 Asteroid selection accuracy</div>
                     </div>
                     """
-                
+
                 if prospectors_used > 0:
                     tons_per_prospector = total_tons / prospectors_used
                     analytics_html += f"""
@@ -1889,7 +2019,7 @@ class ReportGenerator:
                         <div class="stat-help">💡 Tons found per prospector used</div>
                     </div>
                     """
-                
+
                 if asteroids_prospected and asteroids_prospected > 0:
                     tons_per_asteroid = total_tons / asteroids_prospected
                     analytics_html += f"""
@@ -1899,12 +2029,12 @@ class ReportGenerator:
                         <div class="stat-help">🎯 Average yield per asteroid prospected</div>
                     </div>
                     """
-                
+
                 # Ring Quality Assessment - simplified to focus on what actually matters
                 ring_quality = "Poor"
                 quality_explanation = ""
                 quality_score = 0
-                
+
                 # Factor 1: TPH (70% weight) - The primary performance indicator
                 if tph >= 500:
                     quality_score += 70
@@ -1914,9 +2044,9 @@ class ReportGenerator:
                     quality_score += 30
                 else:
                     quality_score += 10
-                
+
                 # Factor 2: Material Diversity (30% weight) - Independent engineering value
-                materials_count = len(session_data.get('materials_mined', {}))
+                materials_count = len(session_data.get("materials_mined", {}))
                 if materials_count > 3:
                     quality_score += 30
                 elif materials_count > 2:
@@ -1925,7 +2055,7 @@ class ReportGenerator:
                     quality_score += 15
                 else:
                     quality_score += 5
-                
+
                 # Determine overall ring quality with simplified thresholds
                 if quality_score >= 85:
                     ring_quality = "Excellent"
@@ -1934,11 +2064,11 @@ class ReportGenerator:
                     ring_quality = "Good"
                     quality_explanation = f"Solid mining location - {tph:.1f} t/h with {materials_count} material types"
                 elif quality_score >= 45:
-                    ring_quality = "Fair" 
+                    ring_quality = "Fair"
                     quality_explanation = f"Decent mining spot - {tph:.1f} t/h with {materials_count} material types"
                 else:
                     quality_explanation = f"Poor mining location - {tph:.1f} t/h with {materials_count} material types"
-                
+
                 analytics_html += f"""
                 <div class="stat-card" title="Overall assessment of this mining location based primarily on tons per hour performance and material diversity for engineering needs. Excellent/Good locations are worth bookmarking for future mining sessions.">
                     <div class="stat-value">{ring_quality}</div>
@@ -1946,14 +2076,14 @@ class ReportGenerator:
                     <div class="stat-help">💎 {quality_explanation}</div>
                 </div>
                 """
-                
+
                 analytics_html += "</div></div>"
-            
+
             # Session Benchmarking (if we have access to historical data)
             benchmark_html = self._generate_session_benchmarking(session_data)
             if benchmark_html:
                 analytics_html += benchmark_html
-                
+
         except Exception as e:
             print(f"Error generating advanced analytics: {e}")
             analytics_html += f"""
@@ -1961,28 +2091,30 @@ class ReportGenerator:
                 <p><strong>Error:</strong> Could not generate advanced analytics: {str(e)}</p>
             </div>
             """
-        
+
         analytics_html += "</div>"
         return analytics_html
-        
+
     def _identify_manual_materials(self, session_data):
         """Identify materials that were manually added from refinery"""
         try:
-            session_file_path = session_data.get('session_file_path')
+            session_file_path = session_data.get("session_file_path")
             if not session_file_path or not os.path.exists(session_file_path):
                 return {}
-            
-            with open(session_file_path, 'r', encoding='utf-8') as f:
+
+            with open(session_file_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            
+
             manual_materials = {}
-            
+
             # Look for manual refinery additions indicators
             # Check for specific patterns that indicate manual addition
             import re
-            
+
             # Pattern 1: Look for "Added refinery materials" messages
-            refinery_matches = re.findall(r'Added refinery materials.*?({.*?})', content, re.DOTALL)
+            refinery_matches = re.findall(
+                r"Added refinery materials.*?({.*?})", content, re.DOTALL
+            )
             for match in refinery_matches:
                 try:
                     # Parse the materials dict if it's in a readable format
@@ -1990,108 +2122,124 @@ class ReportGenerator:
                     pass
                 except:
                     continue
-            
+
             # Pattern 2: Check if session mentions "refinery" or "manual"
-            if any(keyword in content.lower() for keyword in ['refinery', 'manual', 'added']):
+            if any(
+                keyword in content.lower()
+                for keyword in ["refinery", "manual", "added"]
+            ):
                 # Try to identify by checking for sudden material additions
                 # or specific markers in the session text
                 pass
-            
+
             # Pattern 3: Look for cargo breakdown vs refined materials discrepancies
             # Parse REFINED MATERIALS section
-            refined_section = re.search(r'=== REFINED MATERIALS ===(.*?)(?:===|\Z)', content, re.DOTALL)
+            refined_section = re.search(
+                r"=== REFINED MATERIALS ===(.*?)(?:===|\Z)", content, re.DOTALL
+            )
             if refined_section:
                 refined_materials = {}
                 refined_text = refined_section.group(1)
-                
+
                 # Parse refined materials: " - Painite 12t (125.75 t/hr)"
-                material_matches = re.findall(r' - ([A-Za-z\s]+)\s+(\d+(?:\.\d+)?)t', refined_text)
+                material_matches = re.findall(
+                    r" - ([A-Za-z\s]+)\s+(\d+(?:\.\d+)?)t", refined_text
+                )
                 for mat_name, quantity in material_matches:
                     refined_materials[mat_name.strip()] = float(quantity)
-            
-            # Parse CARGO MATERIAL BREAKDOWN section  
-            cargo_section = re.search(r'=== CARGO MATERIAL BREAKDOWN ===(.*?)(?:===|\Z)', content, re.DOTALL)
+
+            # Parse CARGO MATERIAL BREAKDOWN section
+            cargo_section = re.search(
+                r"=== CARGO MATERIAL BREAKDOWN ===(.*?)(?:===|\Z)", content, re.DOTALL
+            )
             if cargo_section:
                 cargo_materials = {}
                 cargo_text = cargo_section.group(1)
-                
+
                 # Parse cargo materials: "Platinum: 32t"
-                material_matches = re.findall(r'^([A-Za-z\s]+):\s*(\d+(?:\.\d+)?)t\s*$', cargo_text, re.MULTILINE)
+                material_matches = re.findall(
+                    r"^([A-Za-z\s]+):\s*(\d+(?:\.\d+)?)t\s*$", cargo_text, re.MULTILINE
+                )
                 for mat_name, quantity in material_matches:
                     cargo_materials[mat_name.strip()] = float(quantity)
-            
+
             # For now, we'll assume all materials listed are legitimate mining results
             # In the future, this could be enhanced by comparing session start/end snapshots
             # or looking for specific manual addition markers in the logs
-            
+
             # Check if there are any indications this session had manual additions
             # by looking for keywords or specific patterns
-            if ('manual' in content.lower() or 
-                'refinery' in content.lower() or 
-                'added' in content.lower()):
+            if (
+                "manual" in content.lower()
+                or "refinery" in content.lower()
+                or "added" in content.lower()
+            ):
                 # If we suspect manual additions but can't parse them specifically,
                 # return empty for now but this could be enhanced
                 pass
-            
+
             return manual_materials
-            
+
         except Exception as e:
             print(f"Error identifying manual materials: {e}")
             return {}
-        
+
     def _parse_session_analytics_from_text(self, session_data):
         """Parse detailed analytics from session text file"""
         try:
-            session_file_path = session_data.get('session_file_path')
+            session_file_path = session_data.get("session_file_path")
             if not session_file_path or not os.path.exists(session_file_path):
                 return None
-            
-            with open(session_file_path, 'r', encoding='utf-8') as f:
+
+            with open(session_file_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            
+
             analytics_data = {}
-            
+
             # Parse hit rate
             import re
-            hit_rate_match = re.search(r'Hit Rate:\s*([\d.]+)%', content)
+
+            hit_rate_match = re.search(r"Hit Rate:\s*([\d.]+)%", content)
             if hit_rate_match:
-                analytics_data['hit_rate'] = float(hit_rate_match.group(1))
-            
+                analytics_data["hit_rate"] = float(hit_rate_match.group(1))
+
             # Parse average quality
-            avg_quality_match = re.search(r'Average Quality:\s*([\d.]+)%', content)
+            avg_quality_match = re.search(r"Average Quality:\s*([\d.]+)%", content)
             if avg_quality_match:
-                analytics_data['avg_quality'] = float(avg_quality_match.group(1))
-            
+                analytics_data["avg_quality"] = float(avg_quality_match.group(1))
+
             # Parse asteroids prospected
-            asteroids_match = re.search(r'(\d+)\s+asteroids? prospected', content, re.IGNORECASE)
+            asteroids_match = re.search(
+                r"(\d+)\s+asteroids? prospected", content, re.IGNORECASE
+            )
             if asteroids_match:
-                analytics_data['asteroids_prospected'] = int(asteroids_match.group(1))
-            
+                analytics_data["asteroids_prospected"] = int(asteroids_match.group(1))
+
             # Parse best material
-            best_material_match = re.search(r'Best Material:\s*([^(\n]+)', content)
+            best_material_match = re.search(r"Best Material:\s*([^(\n]+)", content)
             if best_material_match:
-                analytics_data['best_material'] = best_material_match.group(1).strip()
-            
+                analytics_data["best_material"] = best_material_match.group(1).strip()
+
             return analytics_data if analytics_data else None
-            
+
         except Exception as e:
             print(f"Error parsing session analytics: {e}")
             return None
-        
+
     def _generate_session_benchmarking(self, session_data):
         """Generate session benchmarking comparison"""
         try:
             # Try to import and use mining statistics for comparison
             from mining_statistics import SessionAnalytics
-            
+
             analytics = SessionAnalytics()
             stats = analytics.calculate_statistics()
-            
-            if not stats or stats.get('total_sessions', 0) < 2:
+
+            if not stats or stats.get("total_sessions", 0) < 2:
                 return None
-            
+
             # Use correct field names
-            tons_value = session_data.get('tons', 0)
+            tons_value = session_data.get("tons", 0)
             if isinstance(tons_value, str):
                 try:
                     current_tons = float(tons_value)
@@ -2099,8 +2247,8 @@ class ReportGenerator:
                     current_tons = 0.0
             else:
                 current_tons = float(tons_value) if tons_value is not None else 0.0
-                
-            tph_value = session_data.get('tph', 0)
+
+            tph_value = session_data.get("tph", 0)
             if isinstance(tph_value, str):
                 try:
                     current_tph = float(tph_value)
@@ -2108,23 +2256,23 @@ class ReportGenerator:
                     current_tph = 0.0
             else:
                 current_tph = float(tph_value) if tph_value is not None else 0.0
-            
-            avg_tons = stats.get('avg_tonnage_per_session', 0)
-            best_tons = stats.get('best_session', {}).get('tonnage', 0)
-            best_tph = stats.get('best_session', {}).get('tph', 0)
-            
+
+            avg_tons = stats.get("avg_tonnage_per_session", 0)
+            best_tons = stats.get("best_session", {}).get("tonnage", 0)
+            best_tph = stats.get("best_session", {}).get("tph", 0)
+
             benchmark_html = """
             <div style="background: var(--section-bg); padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid var(--border-color);">
                 <h3 style="margin-top: 0; color: var(--header-color); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">🏆 Session Benchmarking</h3>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
             """
-            
+
             # Tonnage comparison
             if avg_tons > 0:
                 tonnage_vs_avg = ((current_tons - avg_tons) / avg_tons) * 100
                 tonnage_color = "#27ae60" if tonnage_vs_avg >= 0 else "#e74c3c"
                 tonnage_icon = "📈" if tonnage_vs_avg >= 0 else "📉"
-                
+
                 benchmark_html += f"""
                 <div style="background: var(--card-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--card-border); text-align: center;">
                     <div style="font-size: 24px;">{tonnage_icon}</div>
@@ -2133,12 +2281,14 @@ class ReportGenerator:
                     <div style="color: var(--text-color); font-size: 11px;">Current: {self._safe_float(current_tons):.1f}t | Avg: {self._safe_float(avg_tons):.1f}t</div>
                 </div>
                 """
-            
+
             # TPH comparison
             if current_tph > 0 and best_tph > 0:
                 tph_vs_best = (current_tph / best_tph) * 100
-                tph_icon = "🚀" if tph_vs_best >= 80 else "⚡" if tph_vs_best >= 50 else "🐌"
-                
+                tph_icon = (
+                    "🚀" if tph_vs_best >= 80 else "⚡" if tph_vs_best >= 50 else "🐌"
+                )
+
                 benchmark_html += f"""
                 <div style="background: var(--card-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--card-border); text-align: center;">
                     <div style="font-size: 24px;">{tph_icon}</div>
@@ -2147,13 +2297,27 @@ class ReportGenerator:
                     <div style="color: var(--text-color); font-size: 11px;">Current: {self._safe_float(current_tph):.1f} | Best: {self._safe_float(best_tph):.1f}</div>
                 </div>
                 """
-            
+
             # Session ranking
-            total_sessions = stats.get('total_sessions', 0)
+            total_sessions = stats.get("total_sessions", 0)
             # Estimate ranking based on tonnage (simplified)
-            estimated_rank = max(1, min(total_sessions, int(total_sessions * (1 - (current_tons / max(best_tons, 1))))))
-            rank_suffix = "st" if estimated_rank == 1 else "nd" if estimated_rank == 2 else "rd" if estimated_rank == 3 else "th"
-            
+            estimated_rank = max(
+                1,
+                min(
+                    total_sessions,
+                    int(total_sessions * (1 - (current_tons / max(best_tons, 1)))),
+                ),
+            )
+            rank_suffix = (
+                "st"
+                if estimated_rank == 1
+                else (
+                    "nd"
+                    if estimated_rank == 2
+                    else "rd" if estimated_rank == 3 else "th"
+                )
+            )
+
             benchmark_html += f"""
             <div style="background: var(--card-bg); padding: 15px; border-radius: 8px; border: 1px solid var(--card-border); text-align: center;">
                 <div style="font-size: 24px;">🏅</div>
@@ -2162,23 +2326,24 @@ class ReportGenerator:
                 <div style="color: var(--text-color); font-size: 11px;">out of {total_sessions} sessions</div>
             </div>
             """
-            
+
             benchmark_html += "</div></div>"
             return benchmark_html
-            
+
         except Exception as e:
             print(f"Error generating benchmarking: {e}")
             return None
-        
+
     def _generate_comment_section(self, session_data):
         """Generate comment section HTML"""
-        comment = session_data.get('comment', '').strip()
-        
+        comment = session_data.get("comment", "").strip()
+
         if comment:
             # Escape HTML characters for security
             import html
+
             escaped_comment = html.escape(comment)
-            
+
             comment_html = f"""
         <div class="section">
             <h2>💬 Session Comments</h2>
@@ -2198,25 +2363,34 @@ class ReportGenerator:
             </div>
         </div>
             """
-        
+
         return comment_html
-        
+
     def _generate_materials_table(self, session_data):
         """Generate materials breakdown table"""
-        materials_mined = session_data.get('materials_mined', {})
+        materials_mined = session_data.get("materials_mined", {})
         if not materials_mined:
             return "<p>No materials mined this session</p>"
-        
+
         # Filter out summary entries like "Total Cargo Collected"
-        filtered_materials = {k: v for k, v in materials_mined.items() 
-                             if k.lower() not in ['total cargo collected', 'total', 'cargo collected', 'total refined']}
-        
+        filtered_materials = {
+            k: v
+            for k, v in materials_mined.items()
+            if k.lower()
+            not in [
+                "total cargo collected",
+                "total",
+                "cargo collected",
+                "total refined",
+            ]
+        }
+
         if not filtered_materials:
             return "<p>No materials mined this session</p>"
-            
+
         # Calculate session duration for TPH
-        session_duration_hours = session_data.get('session_duration', 0) / 3600.0
-        
+        session_duration_hours = session_data.get("session_duration", 0) / 3600.0
+
         table_html = """
         <table class="data-table">
             <thead>
@@ -2229,11 +2403,15 @@ class ReportGenerator:
             </thead>
             <tbody>
         """
-        
+
         total_tons = sum(filtered_materials.values())
-        for material, quantity in sorted(filtered_materials.items(), key=lambda x: x[1], reverse=True):
+        for material, quantity in sorted(
+            filtered_materials.items(), key=lambda x: x[1], reverse=True
+        ):
             percentage = (quantity / total_tons * 100) if total_tons > 0 else 0
-            mat_tph = (quantity / session_duration_hours) if session_duration_hours > 0 else 0
+            mat_tph = (
+                (quantity / session_duration_hours) if session_duration_hours > 0 else 0
+            )
             table_html += f"""
                 <tr>
                     <td>{material}</td>
@@ -2242,38 +2420,49 @@ class ReportGenerator:
                     <td>{percentage:.1f}%</td>
                 </tr>
             """
-            
+
         table_html += """
             </tbody>
         </table>
         """
-        
+
         return table_html
-    
+
     def _generate_engineering_materials_section(self, session_data):
         """Generate engineering materials section (Option 1 + 2: Summary box + Detailed table)"""
-        engineering_materials = session_data.get('engineering_materials', {})
-        
+        engineering_materials = session_data.get("engineering_materials", {})
+
         if not engineering_materials:
             return ""  # Return empty if no materials
-        
+
         # Material grades mapping
         MATERIAL_GRADES = {
-            "Antimony": 2, "Arsenic": 2, "Boron": 3, "Cadmium": 3,
-            "Carbon": 1, "Chromium": 2, "Germanium": 2, "Iron": 1,
-            "Lead": 1, "Manganese": 2, "Nickel": 1, "Niobium": 3,
-            "Phosphorus": 1, "Polonium": 4, "Rhenium": 1, "Selenium": 4,
-            "Sulphur": 1, "Tin": 3, "Tungsten": 3, "Vanadium": 2,
-            "Zinc": 2, "Zirconium": 2
+            "Antimony": 2,
+            "Arsenic": 2,
+            "Boron": 3,
+            "Cadmium": 3,
+            "Carbon": 1,
+            "Chromium": 2,
+            "Germanium": 2,
+            "Iron": 1,
+            "Lead": 1,
+            "Manganese": 2,
+            "Nickel": 1,
+            "Niobium": 3,
+            "Phosphorus": 1,
+            "Polonium": 4,
+            "Rhenium": 1,
+            "Selenium": 4,
+            "Sulphur": 1,
+            "Tin": 3,
+            "Tungsten": 3,
+            "Vanadium": 2,
+            "Zinc": 2,
+            "Zirconium": 2,
         }
-        
-        grade_names = {
-            1: "Very Common",
-            2: "Common",
-            3: "Standard",
-            4: "Rare"
-        }
-        
+
+        grade_names = {1: "Very Common", 2: "Common", 3: "Standard", 4: "Rare"}
+
         # Group materials by grade
         materials_by_grade = {}
         total_pieces = 0
@@ -2283,13 +2472,20 @@ class ReportGenerator:
                 materials_by_grade[grade] = []
             materials_by_grade[grade].append((material_name, quantity))
             total_pieces += quantity
-        
+
         # Generate summary box (compact overview)
-        summary_materials = sorted(engineering_materials.items(), key=lambda x: x[1], reverse=True)[:3]
-        summary_text = ", ".join([f"{mat} ({qty}) G{MATERIAL_GRADES.get(mat, 0)}" for mat, qty in summary_materials])
+        summary_materials = sorted(
+            engineering_materials.items(), key=lambda x: x[1], reverse=True
+        )[:3]
+        summary_text = ", ".join(
+            [
+                f"{mat} ({qty}) G{MATERIAL_GRADES.get(mat, 0)}"
+                for mat, qty in summary_materials
+            ]
+        )
         if len(engineering_materials) > 3:
             summary_text += f" +{len(engineering_materials)-3} more"
-        
+
         html = f"""
         <div class="materials-summary-box">
             <h3>🔩 Engineering Materials Collected</h3>
@@ -2308,12 +2504,12 @@ class ReportGenerator:
             </thead>
             <tbody>
         """
-        
+
         # Generate table rows grouped by grade
         for grade in sorted(materials_by_grade.keys()):
             grade_label = f"Grade {grade} ({grade_names.get(grade, 'Unknown')})"
             materials = sorted(materials_by_grade[grade])
-            
+
             for idx, (material_name, quantity) in enumerate(materials):
                 if idx == 0:
                     # First material in grade - show grade label
@@ -2332,22 +2528,22 @@ class ReportGenerator:
                     <td>{quantity}</td>
                 </tr>
                     """
-        
+
         html += """
             </tbody>
         </table>
         """
-        
+
         return html
-        
+
     def _generate_raw_data_table(self, session_data):
         """Generate raw session data table"""
         if not session_data:
             return "<p>No session data available</p>"
-            
-        start_snapshot = session_data.get('start_snapshot', {})
-        end_snapshot = session_data.get('end_snapshot', {})
-        
+
+        start_snapshot = session_data.get("start_snapshot", {})
+        end_snapshot = session_data.get("end_snapshot", {})
+
         table_html = """
         <table class="data-table">
             <thead>
@@ -2358,87 +2554,129 @@ class ReportGenerator:
             </thead>
             <tbody>
         """
-        
+
         # Determine session timing information
         session_start = "Unknown"
         session_end = "Unknown"
-        
-        if start_snapshot.get('timestamp'):
-            session_start = datetime.fromtimestamp(start_snapshot.get('timestamp')).strftime("%Y-%m-%d %H:%M:%S")
-        elif session_data.get('date') and session_data.get('date') != 'Unknown':
+
+        if start_snapshot.get("timestamp"):
+            session_start = datetime.fromtimestamp(
+                start_snapshot.get("timestamp")
+            ).strftime("%Y-%m-%d %H:%M:%S")
+        elif session_data.get("date") and session_data.get("date") != "Unknown":
             session_start = f"{session_data.get('date')} (Date from report)"
-        
-        if end_snapshot.get('timestamp'):
-            session_end = datetime.fromtimestamp(end_snapshot.get('timestamp')).strftime("%Y-%m-%d %H:%M:%S")
-        elif session_data.get('date') != 'Unknown' and session_data.get('duration') != '00:00:00':
+
+        if end_snapshot.get("timestamp"):
+            session_end = datetime.fromtimestamp(
+                end_snapshot.get("timestamp")
+            ).strftime("%Y-%m-%d %H:%M:%S")
+        elif (
+            session_data.get("date") != "Unknown"
+            and session_data.get("duration") != "00:00:00"
+        ):
             session_end = f"Start + {session_data.get('duration')} duration"
-        
+
         # Build properties list based on available data
         properties = []
-        
+
         # Always show these if we have detailed report data
-        if session_data.get('data_source') == 'Report Entry':
+        if session_data.get("data_source") == "Report Entry":
             # Detailed report from tree data - show relevant mining statistics
-            materials_count = len(session_data.get('materials_mined', {}))
-            materials_list = ', '.join(session_data.get('materials_mined', {}).keys()) if materials_count > 0 else 'None recorded'
-            
+            materials_count = len(session_data.get("materials_mined", {}))
+            materials_list = (
+                ", ".join(session_data.get("materials_mined", {}).keys())
+                if materials_count > 0
+                else "None recorded"
+            )
+
             base_props = [
-                ("Report Date", session_data.get('date', 'Unknown')),
-                ("Session Duration", session_data.get('duration', 'Unknown')),
+                ("Report Date", session_data.get("date", "Unknown")),
+                ("Session Duration", session_data.get("duration", "Unknown")),
             ]
-            
+
             # Add ship name if available
-            ship_name = session_data.get('ship_name', '').strip()
+            ship_name = session_data.get("ship_name", "").strip()
             if ship_name:
                 base_props.append(("Ship", ship_name))
-            
-            base_props.extend([
-                ("Mining Location", f"{session_data.get('system', 'Unknown')} - {session_data.get('body', 'Unknown')}"),
-                ("Minerals Found", f"{materials_count} types: {materials_list}"),
-            ])
-            
+
+            base_props.extend(
+                [
+                    (
+                        "Mining Location",
+                        f"{session_data.get('system', 'Unknown')} - {session_data.get('body', 'Unknown')}",
+                    ),
+                    ("Minerals Found", f"{materials_count} types: {materials_list}"),
+                ]
+            )
+
             properties.extend(base_props)
-            
+
             # Add engineering materials if any were collected
-            engineering_materials = session_data.get('engineering_materials', {})
+            engineering_materials = session_data.get("engineering_materials", {})
             if engineering_materials:
                 # Format: "Iron (45), Nickel (23), Carbon (89) - Total: 157 pieces"
-                eng_list = ', '.join([f"{mat} ({qty})" for mat, qty in sorted(engineering_materials.items())])
+                eng_list = ", ".join(
+                    [
+                        f"{mat} ({qty})"
+                        for mat, qty in sorted(engineering_materials.items())
+                    ]
+                )
                 total_pieces = sum(engineering_materials.values())
-                properties.append(("Engineering Materials", f"{eng_list} - Total: {total_pieces} pieces"))
-            
+                properties.append(
+                    (
+                        "Engineering Materials",
+                        f"{eng_list} - Total: {total_pieces} pieces",
+                    )
+                )
+
             properties.append(("Data Source", "Report entry from mining log"))
         else:
             # Original detailed session data - only show cargo if we have meaningful data
-            cargo_available = (start_snapshot.get('total_cargo', 0) > 0 or 
-                             end_snapshot.get('total_cargo', 0) > 0 or 
-                             start_snapshot.get('max_cargo', 0) > 0)
-            
-            properties.extend([
-                ("Session Start", session_start),
-                ("Session End", session_end),
-            ])
-            
+            cargo_available = (
+                start_snapshot.get("total_cargo", 0) > 0
+                or end_snapshot.get("total_cargo", 0) > 0
+                or start_snapshot.get("max_cargo", 0) > 0
+            )
+
+            properties.extend(
+                [
+                    ("Session Start", session_start),
+                    ("Session End", session_end),
+                ]
+            )
+
             # Only add cargo information if we have meaningful data
             if cargo_available:
-                properties.extend([
-                    ("Start Cargo", f"{start_snapshot.get('total_cargo', 0)} tons"),
-                    ("End Cargo", f"{end_snapshot.get('total_cargo', 0)} tons"),
-                    ("Max Cargo", f"{start_snapshot.get('max_cargo', 0)} tons")
-                ])
+                properties.extend(
+                    [
+                        ("Start Cargo", f"{start_snapshot.get('total_cargo', 0)} tons"),
+                        ("End Cargo", f"{end_snapshot.get('total_cargo', 0)} tons"),
+                        ("Max Cargo", f"{start_snapshot.get('max_cargo', 0)} tons"),
+                    ]
+                )
             else:
                 properties.append(("Cargo Tracking", "Not available for this session"))
-            
+
             # Add engineering materials if any were collected
-            engineering_materials = session_data.get('engineering_materials', {})
+            engineering_materials = session_data.get("engineering_materials", {})
             if engineering_materials:
                 # Format: "Iron (45), Nickel (23), Carbon (89) - Total: 157 pieces"
-                eng_list = ', '.join([f"{mat} ({qty})" for mat, qty in sorted(engineering_materials.items())])
+                eng_list = ", ".join(
+                    [
+                        f"{mat} ({qty})"
+                        for mat, qty in sorted(engineering_materials.items())
+                    ]
+                )
                 total_pieces = sum(engineering_materials.values())
-                properties.append(("Engineering Materials", f"{eng_list} - Total: {total_pieces} pieces"))
-            
+                properties.append(
+                    (
+                        "Engineering Materials",
+                        f"{eng_list} - Total: {total_pieces} pieces",
+                    )
+                )
+
             properties.append(("Data Source", "Detailed mining session data"))
-        
+
         for prop, value in properties:
             table_html += f"""
                 <tr>
@@ -2446,49 +2684,51 @@ class ReportGenerator:
                     <td>{value}</td>
                 </tr>
             """
-            
+
         table_html += """
             </tbody>
         </table>
         """
-        
+
         return table_html
-        
+
     def preview_report(self, html_content):
         """Preview report in system browser"""
         try:
             # Create temporary HTML file
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".html", delete=False, encoding="utf-8"
+            ) as f:
                 f.write(html_content)
                 temp_path = f.name
-                
+
             # Open in default browser
-            webbrowser.open(f'file://{temp_path}')
+            webbrowser.open(f"file://{temp_path}")
             return temp_path
-            
+
         except Exception as e:
             print(f"Error previewing report: {e}")
             return None
-            
+
     def save_report(self, html_content, session_filename):
         """Save HTML report to Reports folder"""
         try:
             # Generate HTML filename from session filename
-            if session_filename.endswith('.txt'):
-                html_filename = session_filename.replace('.txt', '.html')
-            elif session_filename.endswith('.html'):
+            if session_filename.endswith(".txt"):
+                html_filename = session_filename.replace(".txt", ".html")
+            elif session_filename.endswith(".html"):
                 html_filename = session_filename
             else:
                 html_filename = f"{session_filename}.html"
-                
+
             html_path = os.path.join(self.enhanced_reports_dir, html_filename)
-            
+
             # Save HTML file
-            with open(html_path, 'w', encoding='utf-8') as f:
+            with open(html_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
-                
+
             return html_path
-            
+
         except Exception as e:
             print(f"Error saving report: {e}")
             return None

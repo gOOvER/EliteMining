@@ -1,14 +1,16 @@
 import sqlite3
 
-conn = sqlite3.connect('data/user_data.db')
+conn = sqlite3.connect("data/user_data.db")
 cursor = conn.cursor()
 
-cursor.execute('''
+cursor.execute(
+    """
     SELECT body_name, ring_type, ls_distance, material_name
     FROM hotspot_data 
     WHERE system_name='Macua' 
     LIMIT 10
-''')
+"""
+)
 
 print("Macua Ring Data After EDSM Update:")
 print("-" * 70)
