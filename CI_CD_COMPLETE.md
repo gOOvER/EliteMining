@@ -74,7 +74,7 @@ Auto-PR Creation: With appropriate labels and reviews
 
 ### **1. Test Job**
 - **Duration**: ~8-15 minutes per Python version
-- **Matrix Strategy**: 4 Python versions in parallel
+- **Matrix Strategy**: 6 Python versions in parallel
 - **Coverage**: Code quality, unit tests, integration tests
 - **Artifacts**: Coverage reports, test results
 
@@ -107,13 +107,13 @@ Auto-PR Creation: With appropriate labels and reviews
 ## 📊 Expected Performance
 
 ### **Resource Usage**
-- **GitHub Actions Minutes**: ~50-80 per full pipeline run
+- **GitHub Actions Minutes**: ~75-120 per full pipeline run
 - **Storage**: ~100-500MB per build artifact
 - **Network**: Minimal (cached dependencies)
 
 ### **Execution Times**
-- **Quick PR Check**: 5-8 minutes (no build)
-- **Full Pipeline**: 15-25 minutes (with build)
+- **Quick PR Check**: 8-12 minutes (no build)
+- **Full Pipeline**: 20-35 minutes (with build)
 - **Security Scan**: 3-5 minutes
 - **Dependency Update**: 10-15 minutes
 
