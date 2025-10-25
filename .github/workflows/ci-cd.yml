@@ -1,0 +1,346 @@
+name: EliteMining CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, copilot ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run dependency checks weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      run_dependency_update:
+        description: 'Force dependency update'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  # Code Quality and Testing
+  test:
+    name: Code Quality & Testing
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install system dependencies
+      run: |
+        # Install system dependencies for Windows
+        choco install --no-progress -y git
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        
+        # Install core dependencies
+        pip install pywin32 requests matplotlib
+        
+        # Install development dependencies
+        pip install pytest pytest-cov pytest-mock flake8 black isort mypy
+        
+        # Install optional dependencies for better performance
+        pip install watchdog || echo "Watchdog installation failed - will use polling fallback"
+        
+        # Install requirements if they exist
+        if (Test-Path "requirements.txt") { pip install -r requirements.txt }
+        if (Test-Path "requirements-dev.txt") { pip install -r requirements-dev.txt }
+        
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 app/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: Check code formatting with black
+      run: |
+        black --check --diff app/
+        
+    - name: Check import sorting with isort
+      run: |
+        isort --check-only --diff app/
+        
+    - name: Type checking with mypy
+      run: |
+        mypy app/ --ignore-missing-imports --no-strict-optional || echo "Type checking completed with warnings"
+        
+    - name: Run optimization tests
+      run: |
+        cd app
+        python -m pytest ../test_optimizations.py -v --tb=short
+        
+    - name: Run custom EliteMining tests
+      run: |
+        # Test file watcher module
+        python -c "from app.file_watcher import create_elite_watcher; print('✅ File watcher import successful')"
+        
+        # Test config system
+        python -c "from app.config import batch_config_update; print('✅ Config system import successful')"
+        
+        # Test announcer system (will fail gracefully without win32com in CI)
+        python -c "
+        try:
+            from app.announcer import cleanup_tts
+            print('✅ Announcer system import successful')
+        except ImportError as e:
+            print(f'⚠️ Announcer import failed (expected in CI): {e}')
+        "
+        
+    - name: Test PyInstaller build compatibility
+      if: matrix.python-version == '3.11'  # Only test on one Python version
+      run: |
+        pip install pyinstaller
+        # Test if PyInstaller can analyze the main script
+        pyinstaller --noconfirm --log-level=WARN --onefile --windowed app/main.py --name EliteMining-Test --distpath dist-test
+        echo "✅ PyInstaller build test successful"
+        
+    - name: Upload test artifacts
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-failure-logs-${{ matrix.python-version }}
+        path: |
+          *.log
+          test-results/
+          
+  # Security and Dependency Checks
+  security:
+    name: Security & Dependency Analysis
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety bandit semgrep
+        
+    - name: Run safety check for vulnerabilities
+      run: |
+        # Create a temporary requirements file with current dependencies
+        echo "pywin32" > temp-requirements.txt
+        echo "requests" >> temp-requirements.txt
+        echo "matplotlib" >> temp-requirements.txt
+        echo "watchdog" >> temp-requirements.txt
+        
+        safety check -r temp-requirements.txt --json || echo "Safety check completed with warnings"
+        
+    - name: Run bandit security analysis
+      run: |
+        bandit -r app/ -f json -o bandit-report.json || echo "Bandit analysis completed"
+        
+    - name: Upload security reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  # Dependency Update Job
+  dependency-update:
+    name: Dependency Updates
+    runs-on: ubuntu-latest
+    if: github.event.schedule || github.event.inputs.run_dependency_update == 'true'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependency update tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-tools pipdeptree
+        
+    - name: Create requirements files if they don't exist
+      run: |
+        # Create requirements.txt if it doesn't exist
+        if [ ! -f requirements.txt ]; then
+          cat > requirements.txt << EOF
+        # Core dependencies for EliteMining
+        pywin32>=227
+        requests>=2.28.0
+        matplotlib>=3.5.0
+        
+        # Optional performance improvements
+        watchdog>=2.1.0
+        EOF
+        fi
+        
+        # Create requirements-dev.txt if it doesn't exist
+        if [ ! -f requirements-dev.txt ]; then
+          cat > requirements-dev.txt << EOF
+        # Development dependencies
+        pytest>=7.0.0
+        pytest-cov>=4.0.0
+        pytest-mock>=3.10.0
+        flake8>=6.0.0
+        black>=23.0.0
+        isort>=5.12.0
+        mypy>=1.0.0
+        pyinstaller>=5.13.0
+        
+        # Security tools
+        safety>=2.3.0
+        bandit>=1.7.0
+        EOF
+        fi
+        
+    - name: Update dependencies
+      run: |
+        # Update main dependencies
+        pip-compile --upgrade requirements.txt
+        
+        # Update development dependencies
+        pip-compile --upgrade requirements-dev.txt
+        
+    - name: Check for security vulnerabilities in updates
+      run: |
+        pip install -r requirements.txt
+        safety check || echo "Security check completed with warnings"
+        
+    - name: Create Pull Request for dependency updates
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "chore: update dependencies"
+        title: "🔄 Automated Dependency Updates"
+        body: |
+          ## 🔄 Automated Dependency Updates
+          
+          This PR updates project dependencies to their latest compatible versions.
+          
+          ### Changes:
+          - Updated `requirements.txt` with latest stable versions
+          - Updated `requirements-dev.txt` with latest development tools
+          - Security vulnerabilities checked with `safety`
+          
+          ### Review Notes:
+          - All tests must pass before merging
+          - Review breaking changes in dependency changelogs
+          - Test EliteMining functionality after merging
+          
+          Auto-generated by GitHub Actions 🤖
+        branch: automated-dependency-updates
+        labels: |
+          dependencies
+          automated
+        reviewers: |
+          gOOvER
+
+  # Build and Release (only on main branch)
+  build:
+    name: Build Application
+    runs-on: windows-latest
+    needs: [test, security]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pywin32 requests matplotlib pyinstaller
+        pip install watchdog || echo "Watchdog optional dependency failed"
+        
+    - name: Build with PyInstaller
+      run: |
+        # Clean previous builds
+        if (Test-Path "dist") { Remove-Item -Recurse -Force dist }
+        if (Test-Path "build") { Remove-Item -Recurse -Force build }
+        
+        # Run PyInstaller build
+        python -m PyInstaller --clean Configurator.spec
+        
+    - name: Create build info
+      run: |
+        $buildInfo = @{
+          "build_date" = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
+          "commit_sha" = "${{ github.sha }}"
+          "branch" = "${{ github.ref_name }}"
+          "python_version" = python --version
+        } | ConvertTo-Json
+        
+        $buildInfo | Out-File -FilePath "dist/build_info.json" -Encoding UTF8
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: elitemining-build-${{ github.sha }}
+        path: |
+          dist/
+          !dist/build/
+        retention-days: 30
+
+  # Notification job
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [test, security, build]
+    if: always()
+    
+    steps:
+    - name: Determine overall status
+      id: status
+      run: |
+        if [[ "${{ needs.test.result }}" == "success" && "${{ needs.security.result }}" == "success" ]]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "message=✅ All checks passed successfully!" >> $GITHUB_OUTPUT
+        else
+          echo "status=failure" >> $GITHUB_OUTPUT
+          echo "message=❌ Some checks failed. Please review the results." >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Create status summary
+      run: |
+        echo "## 🚀 EliteMining CI/CD Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Code Quality & Testing | ${{ needs.test.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Security Analysis | ${{ needs.security.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Build | ${{ needs.build.result == 'success' && '✅ Passed' || needs.build.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Overall Status**: ${{ steps.status.outputs.message }}" >> $GITHUB_STEP_SUMMARY

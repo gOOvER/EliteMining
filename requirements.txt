@@ -1,0 +1,19 @@
+# Core dependencies for EliteMining
+# Production requirements for the Elite Dangerous mining application
+
+# Windows COM interface for TTS and system integration
+pywin32>=227
+
+# HTTP requests for EDSM integration and updates
+requests>=2.28.0,<3.0.0
+
+# Plotting and charts for mining statistics
+matplotlib>=3.5.0,<4.0.0
+
+# Optional: File system monitoring for better performance
+# Falls back to polling if not available
+watchdog>=2.1.0,<4.0.0
+
+# JSON handling improvements (usually included in Python 3.9+)
+# Only needed for older Python versions
+# ujson>=5.0.0; python_version < "3.9"
