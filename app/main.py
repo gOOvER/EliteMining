@@ -21,13 +21,10 @@ import glob
 import re
 import shutil
 import datetime as dt
-import logging
-import logging
 from logging.handlers import RotatingFileHandler
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from typing import Dict, Optional, Any, List
-import sys
 import threading
 import time
 import zipfile
@@ -1127,6 +1124,14 @@ class CargoMonitor:
     - self.materials_collected: Engineering materials (Raw)
     """
     def __init__(self, update_callback=None, capacity_changed_callback=None, ship_info_changed_callback=None, app_dir=None):
+        # Threading safety
+        self._lock = threading.RLock()  # Reentrant lock for thread safety
+        self._stop_event = threading.Event()  # For clean thread shutdown
+        
+        # Event-driven file monitoring
+        self.file_watcher = None
+        self._use_event_monitoring = True  # Prefer event-driven over polling
+        
         self.cargo_window = None
         self.cargo_label = None
         self.position = "upper_right"
@@ -2147,16 +2152,64 @@ cargo panel forces Elite to write detailed inventory data.
         self.find_latest_journal()
     
     def _start_background_monitoring(self):
-        """Start background monitoring that works without cargo window"""
+        """Start event-driven background monitoring that works without cargo window"""
         self.last_status_mtime = 0
         self.last_capacity_check = 0
         self.last_heartbeat = time.time()  # Track thread health
         
+        # Try to setup event-driven file monitoring first
+        if self._use_event_monitoring:
+            self._setup_event_monitoring()
+        
+        # Always start a lightweight background thread for periodic tasks
         def background_monitor():
-            while self.journal_monitor_active:
+            """Lightweight background thread for periodic tasks (not file polling)"""
+            while not self._stop_event.is_set():
                 try:
-                    # Heartbeat: Log every 60 seconds to verify thread is alive
-                    current_time = time.time()
+                    with self._lock:  # Thread-safe access to shared data
+                        if not self.journal_monitor_active:
+                            if self._stop_event.wait(5.0):  # Check every 5 seconds when inactive
+                                break
+                            continue
+                        
+                        # Heartbeat: Log every 60 seconds to verify thread is alive
+                        current_time = time.time()
+                        if current_time - self.last_heartbeat > 60:
+                            self.last_heartbeat = current_time
+                            monitoring_status = "Event-driven" if (self.file_watcher and self.file_watcher.is_active()) else "Polling"
+                            logging.info(f"[HEARTBEAT] {monitoring_status} monitor alive - Materials: {len(self.materials_collected)}")
+                        
+                        # Periodic capacity validation (every 30 seconds during mining)
+                        if current_time - self.last_capacity_check > 30:
+                            self.last_capacity_check = current_time
+                            if not self._validate_cargo_capacity():
+                                # Try multiple refresh methods
+                                if not self.refresh_ship_capacity():
+                                    self._force_loadout_scan()
+                        
+                        # If event monitoring failed, fall back to polling
+                        if not self.file_watcher or not self.file_watcher.is_active():
+                            self._fallback_polling_check()
+                            
+                except Exception as e:
+                    logging.error(f"[BACKGROUND_MONITOR] ERROR: {e}")
+                    import traceback
+                    logging.error(traceback.format_exc())
+                
+                # Interruptible sleep for clean shutdown (much longer since we're not polling)
+                if self._stop_event.wait(10.0):  # 10 second intervals for periodic tasks
+                    break
+            """Thread-safe background monitoring with proper locking"""
+            while not self._stop_event.is_set():
+                try:
+                    with self._lock:  # Thread-safe access to shared data
+                        if not self.journal_monitor_active:
+                            if self._stop_event.wait(0.5):
+                                break
+                            continue
+                        
+                        # Heartbeat: Log every 60 seconds to verify thread is alive
+                        current_time = time.time()
                     if current_time - self.last_heartbeat > 60:
                         self.last_heartbeat = current_time
                         logging.info(f"[HEARTBEAT] Background monitor alive - Materials: {len(self.materials_collected)}")
@@ -3712,6 +3765,139 @@ cargo panel forces Elite to write detailed inventory data.
             print(f"Error updating CSV after refinery addition: {e}")
             import traceback
             traceback.print_exc()
+    
+    def _setup_event_monitoring(self):
+        """Setup event-driven file monitoring using file watcher"""
+        try:
+            from file_watcher import create_elite_watcher
+            
+            if not os.path.exists(self.journal_dir):
+                logging.warning(f"Journal directory not found: {self.journal_dir}")
+                return
+            
+            self.file_watcher = create_elite_watcher(self.journal_dir)
+            
+            # Set up callbacks for different file types
+            self.file_watcher.set_journal_callback(self._on_journal_file_changed)
+            self.file_watcher.set_cargo_callback(self._on_cargo_file_changed)
+            self.file_watcher.set_status_callback(self._on_status_file_changed)
+            
+            # Start monitoring
+            self.file_watcher.start_monitoring()
+            
+            if self.file_watcher.is_active():
+                logging.info("[CARGO_MONITOR] Event-driven file monitoring started successfully")
+                if hasattr(self, 'status_label'):
+                    self.status_label.configure(text="⚡ Event-driven monitoring active")
+            else:
+                logging.warning("[CARGO_MONITOR] Event-driven monitoring failed, will use polling fallback")
+                
+        except ImportError:
+            logging.info("[CARGO_MONITOR] Watchdog not available, using polling fallback")
+            self.file_watcher = None
+        except Exception as e:
+            logging.error(f"[CARGO_MONITOR] Failed to setup event monitoring: {e}")
+            self.file_watcher = None
+    
+    def _on_journal_file_changed(self, file_path: str):
+        """Callback when journal file changes"""
+        try:
+            with self._lock:
+                # Update the latest journal file if it's newer
+                if not self.last_journal_file or file_path != self.last_journal_file:
+                    if os.path.exists(file_path):
+                        current_mtime = os.path.getmtime(file_path)
+                        if (not self.last_journal_file or 
+                            not os.path.exists(self.last_journal_file) or
+                            current_mtime > os.path.getmtime(self.last_journal_file)):
+                            
+                            logging.info(f"[EVENT] New journal file detected: {os.path.basename(file_path)}")
+                            self.last_journal_file = file_path
+                            self.last_file_size = 0  # Start reading from beginning
+                
+                # Process new journal entries
+                self.read_new_journal_entries()
+                
+        except Exception as e:
+            logging.error(f"[EVENT] Error processing journal change: {e}")
+    
+    def _on_cargo_file_changed(self, file_path: str):
+        """Callback when Cargo.json changes"""
+        try:
+            with self._lock:
+                self.read_cargo_json()
+        except Exception as e:
+            logging.error(f"[EVENT] Error processing cargo change: {e}")
+    
+    def _on_status_file_changed(self, file_path: str):
+        """Callback when Status.json changes"""
+        try:
+            with self._lock:
+                self._check_status_for_ship_changes()
+        except Exception as e:
+            logging.error(f"[EVENT] Error processing status change: {e}")
+    
+    def _fallback_polling_check(self):
+        """Fallback polling when event monitoring is not available"""
+        try:
+            # Check Status.json first for ship changes (faster than journal)
+            self._check_status_for_ship_changes()
+            
+            # Check for Cargo.json updates (most accurate)
+            self.read_cargo_json()
+            
+            # Check if journal file has grown (new entries) OR if a newer journal file exists
+            if self.last_journal_file and os.path.exists(self.last_journal_file):
+                current_size = os.path.getsize(self.last_journal_file)
+                
+                # Also check if there's a NEWER journal file (daily rotation)
+                journal_files = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
+                if journal_files:
+                    latest_file = max(journal_files, key=os.path.getmtime)
+                    if latest_file != self.last_journal_file:
+                        logging.info(f"[POLLING] Detected new journal file: {os.path.basename(latest_file)}")
+                        self.last_journal_file = latest_file
+                        self.last_file_size = 0  # Start reading from beginning of new file
+                        return  # Skip to next iteration to process new file
+                
+                if current_size > self.last_file_size:
+                    self.read_new_journal_entries()
+                    self.last_file_size = current_size
+            else:
+                # Check for new journal file
+                self.find_latest_journal()
+                
+        except Exception as e:
+            logging.error(f"[POLLING] Error in fallback polling: {e}")
+
+    def cleanup(self):
+        """Clean shutdown of CargoMonitor with proper thread cleanup"""
+        try:
+            # Signal threads to stop
+            self._stop_event.set()
+            
+            # Stop file monitoring
+            if self.file_watcher:
+                self.file_watcher.stop_monitoring()
+                self.file_watcher = None
+            
+            # Stop journal monitoring
+            self.journal_monitor_active = False
+            
+            # Wait a moment for threads to finish
+            import time
+            time.sleep(1)
+            
+            # Clear data
+            with self._lock:
+                self.cargo_items.clear()
+                self.materials_collected.clear()
+                self.session_minerals_mined.clear()
+                self.session_materials_collected.clear()
+            
+            print("[CargoMonitor] Cleanup completed")
+        except Exception as e:
+            print(f"[CargoMonitor] Cleanup error: {e}")
 
 from prospector_panel import ProspectorPanel
 
@@ -8056,10 +8242,41 @@ Would you like to scan your Elite Dangerous journal files to import your mining 
         # Run in background thread to not block UI
         thread = threading.Thread(target=scan_in_background, daemon=True)
         thread.start()
+    
+    def on_closing(self):
+        """Proper cleanup when application is closing"""
+        try:
+            print("[APP] Starting application cleanup...")
+            
+            # Stop cargo monitor
+            if hasattr(self, 'cargo_monitor') and self.cargo_monitor:
+                self.cargo_monitor.cleanup()
+            
+            # Stop prospector panel
+            if hasattr(self, 'prospector_panel') and self.prospector_panel:
+                if hasattr(self.prospector_panel, 'cleanup'):
+                    self.prospector_panel.cleanup()
+            
+            # Cleanup TTS system
+            try:
+                import announcer
+                announcer.cleanup_tts()
+            except:
+                pass
+            
+            print("[APP] Cleanup completed")
+        except Exception as e:
+            print(f"[APP] Cleanup error: {e}")
+        finally:
+            self.destroy()
 
 if __name__ == "__main__":
     try:
         app = App()
+        
+        # Set up proper cleanup on window close
+        app.protocol("WM_DELETE_WINDOW", app.on_closing)
+        
         app.mainloop()
     except Exception as e:
         # Show error dialog with full traceback

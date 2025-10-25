@@ -89,9 +89,19 @@ def update_config_value(key: str, value: Any) -> None:
 
 def update_config_values(updates: Dict[str, Any]) -> None:
     """Update multiple config keys without affecting other values"""
+    global _cached_config, _last_load_time
+    
     cfg = _load_cfg()
     cfg.update(updates)
     _save_cfg(cfg)
+    
+    # Update cache to reflect changes immediately
+    _cached_config = cfg
+    _last_load_time = time.time()
+
+def batch_config_update(updates: Dict[str, Any]) -> None:
+    """Optimized batch update for multiple config changes - preferred method"""
+    return update_config_values(updates)
 
 def load_saved_va_folder() -> Optional[str]:
     cfg = _load_cfg()
