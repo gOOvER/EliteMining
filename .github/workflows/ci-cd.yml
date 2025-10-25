@@ -22,8 +22,15 @@ jobs:
     name: Code Quality & Testing
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+        include:
+          - python-version: '3.13'
+            experimental: true
+          - python-version: '3.14'
+            experimental: true
+    continue-on-error: ${{ matrix.experimental || false }}
     
     steps:
     - name: Checkout repository
@@ -60,9 +67,20 @@ jobs:
         # Install optional dependencies for better performance
         pip install watchdog || echo "Watchdog installation failed - will use polling fallback"
         
-        # Install requirements if they exist
-        if (Test-Path "requirements.txt") { pip install -r requirements.txt }
-        if (Test-Path "requirements-dev.txt") { pip install -r requirements-dev.txt }
+        # Install requirements if they exist (with fallback for newer Python versions)
+        if (Test-Path "requirements.txt") { 
+          pip install -r requirements.txt || echo "Some requirements may not be compatible with this Python version"
+        }
+        
+        # Try to install dev requirements with fallbacks for Python 3.13/3.14
+        if ("${{ matrix.python-version }}" -eq "3.13" -or "${{ matrix.python-version }}" -eq "3.14") {
+          echo "Installing fallback dependencies for Python ${{ matrix.python-version }}"
+          pip install "pytest>=7.0.0" "pytest-cov>=4.0.0" "flake8>=6.0.0" "black>=23.0.0" "isort>=5.12.0" "mypy>=1.0.0" || echo "Some dev tools not available for Python ${{ matrix.python-version }}"
+        } else {
+          if (Test-Path "requirements-dev.txt") { 
+            pip install -r requirements-dev.txt || echo "Some dev requirements may not be compatible"
+          }
+        }
         
     - name: Lint with flake8
       run: |

@@ -1,0 +1,31 @@
+# Development dependencies for EliteMining - Python 3.13/3.14 Compatible
+# Fallback requirements for newer Python versions where some packages may not be available
+
+# Testing framework and extensions
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+
+# Code quality tools
+flake8>=6.0.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.0.0
+
+# Security scanning (if available)
+safety>=2.3.0 ; python_version < "3.13"
+bandit>=1.7.0
+
+# Build tools (PyInstaller may not support newest Python yet)
+# pyinstaller>=6.0.0 ; python_version < "3.13"
+
+# Development utilities
+pip-tools>=7.0.0
+
+# Windows COM support
+pywin32>=227 ; sys_platform == "win32"
+
+# Core application dependencies
+requests>=2.28.0
+matplotlib>=3.5.0
+watchdog>=2.1.0
